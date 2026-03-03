@@ -1,0 +1,661 @@
+---
+title: Wallet Creation and Management
+description: Learn how to create, manage, and interact with Crossmint wallets across multiple chains
+---
+
+# Wallet Creation and Management
+
+This guide demonstrates how to create and manage wallets using the Crossmint SDK, including balance checking, token transfers, and advanced operations.
+
+## Demo Repository
+
+<Card title="Wallets Quickstart" icon="github" href="https://github.com/Crossmint/wallets-quickstart">
+  Complete wallet integration example with UI components ([Live Demo](https://wallets.demos-crossmint.com/))
+</Card>
+
+## Installation
+
+<CodeGroup>
+
+```bash React
+npm install @crossmint/client-sdk-react-ui
+```
+
+```bash React Native
+npm install @crossmint/client-sdk-react-native-ui expo-secure-store expo-web-browser expo-device
+```
+
+```bash Wallets SDK
+npm install @crossmint/wallets-sdk
+```
+
+</CodeGroup>
+
+## Setup
+
+### React Setup
+
+Wrap your application with the required providers:
+
+<CodeGroup>
+
+```tsx app/providers.tsx
+"use client";
+
+import {
+  CrossmintProvider,
+  CrossmintAuthProvider,
+  CrossmintWalletProvider
+} from "@crossmint/client-sdk-react-ui";
+
+export function Providers({ children }: { children: React.ReactNode }) {
+  return (
+    <CrossmintProvider apiKey={process.env.NEXT_PUBLIC_CROSSMINT_API_KEY}>
+      <CrossmintAuthProvider
+        loginMethods={["google", "twitter", "email"]}
+      >
+        <CrossmintWalletProvider
+          createOnLogin={{
+            chain: "solana", // or "polygon", "base", "ethereum", etc.
+            signer: { type: "email" }
+          }}
+        >
+          {children}
+        </CrossmintWalletProvider>
+      </CrossmintAuthProvider>
+    </CrossmintProvider>
+  );
+}
+```
+
+</CodeGroup>
+
+### Wallets SDK Setup
+
+<CodeGroup>
+
+```ts wallets-sdk.ts
+import { CrossmintWallets, createCrossmint } from "@crossmint/wallets-sdk";
+
+const crossmint = createCrossmint({
+    apiKey: process.env.CROSSMINT_API_KEY,
+    experimental_customAuth: {
+        jwt: "<your-jwt>", // Required for client-side calls
+    },
+});
+
+const crossmintWallets = CrossmintWallets.from(crossmint);
+```
+
+</CodeGroup>
+
+## Creating Wallets
+
+### Basic Wallet Creation
+
+<CodeGroup>
+
+```tsx React
+import { useWallet } from "@crossmint/client-sdk-react-ui";
+
+export default function CreateWallet() {
+  const { wallet, status, getOrCreateWallet } = useWallet();
+
+  // Wallet is automatically created when using createOnLogin in provider
+  // Or create manually:
+  const createSolanaWallet = async () => {
+    const wallet = await getOrCreateWallet({
+      chain: "solana",
+      signer: { type: "email" }
+    });
+    console.log("Wallet address:", wallet.address);
+  };
+
+  if (status === "loaded") {
+    return (
+      <div>
+        <p>Wallet Address: {wallet?.address}</p>
+        <p>Chain: {wallet?.chain}</p>
+      </div>
+    );
+  }
+
+  return <p>Loading wallet...</p>;
+}
+```
+
+```ts Wallets SDK
+const wallet = await crossmintWallets.getOrCreateWallet({
+    chain: "solana",
+    signer: {
+        type: "email",
+        email: "user@example.com",
+        onAuthRequired: async (needsAuth, sendEmailWithOtp, verifyOtp, reject) => {
+            if (needsAuth) {
+                await sendEmailWithOtp();
+                // Prompt user for OTP code
+                const otp = await promptUserForOtp();
+                await verifyOtp(otp);
+            }
+        },
+    },
+});
+
+console.log("Wallet address:", wallet.address);
+```
+
+</CodeGroup>
+
+### Multi-Chain Wallet Creation
+
+Create wallets for different blockchains:
+
+<CodeGroup>
+
+```tsx React
+import { useState } from "react";
+import { useWallet } from "@crossmint/client-sdk-react-ui";
+
+type ChainType = "solana" | "polygon" | "base" | "ethereum";
+
+export default function MultiChainWallet() {
+  const { wallet, getOrCreateWallet } = useWallet();
+  const [selectedChain, setSelectedChain] = useState<ChainType>("solana");
+
+  const switchChain = async (chain: ChainType) => {
+    const newWallet = await getOrCreateWallet({
+      chain,
+      signer: { type: "email" }
+    });
+    setSelectedChain(chain);
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div>
+        <p className="font-bold">Current Chain: {wallet?.chain}</p>
+        <p>Address: {wallet?.address}</p>
+      </div>
+      
+      <div className="flex gap-2">
+        <button onClick={() => switchChain("solana")}>Solana</button>
+        <button onClick={() => switchChain("polygon")}>Polygon</button>
+        <button onClick={() => switchChain("base")}>Base</button>
+        <button onClick={() => switchChain("ethereum")}>Ethereum</button>
+      </div>
+    </div>
+  );
+}
+```
+
+</CodeGroup>
+
+<Note>
+  Crossmint supports 20+ EVM chains including Ethereum, Polygon, Base, Arbitrum, Optimism, and Solana. See the full list in the [chains reference](/api-reference/types/chains).
+</Note>
+
+## Checking Balances
+
+### Display Wallet Balances
+
+<CodeGroup>
+
+```tsx React
+import { useEffect, useState } from "react";
+import { type Balances, useWallet } from "@crossmint/client-sdk-react-ui";
+
+export function WalletBalance() {
+    const { wallet } = useWallet();
+    const [balances, setBalances] = useState<Balances | null>(null);
+
+    useEffect(() => {
+        async function fetchBalances() {
+            if (!wallet) return;
+            
+            try {
+                const balances = await wallet.balances(["usdxm"]);
+                setBalances(balances);
+            } catch (error) {
+                console.error("Error fetching balances:", error);
+            }
+        }
+        fetchBalances();
+    }, [wallet]);
+
+    if (!balances) return <p>Loading balances...</p>;
+
+    const formatBalance = (amount: string) => parseFloat(amount).toFixed(2);
+
+    return (
+        <div className="flex flex-col gap-2">
+            {/* Native token */}
+            <div className="flex justify-between items-center">
+                <p className="font-medium">
+                    {wallet?.chain === "solana" ? "SOL" : "ETH"}
+                </p>
+                <p className="font-medium">
+                    {formatBalance(balances.nativeToken.amount)}
+                </p>
+            </div>
+
+            {/* USDXM token */}
+            <div className="flex justify-between items-center">
+                <p className="font-medium">USDXM</p>
+                <p className="font-medium">
+                    ${formatBalance(
+                        balances.tokens?.find(t => 
+                            t.symbol?.toLowerCase() === "usdxm"
+                        )?.amount ?? "0"
+                    )}
+                </p>
+            </div>
+        </div>
+    );
+}
+```
+
+```ts Wallets SDK
+const balances = await wallet.balances(["usdxm"]);
+
+console.log("Native token:", balances.nativeToken.amount);
+console.log("USDC:", balances.usdc?.amount);
+console.log("USDXM:", balances.tokens?.find(t => t.symbol === "usdxm")?.amount);
+```
+
+</CodeGroup>
+
+## Transferring Tokens
+
+### EVM Transfer
+
+<CodeGroup>
+
+```tsx components/EVMTransfer.tsx
+import { useState } from "react";
+import { useWallet } from "@crossmint/client-sdk-react-ui";
+import { isAddress } from "viem";
+
+export function EVMTransferFunds() {
+    const { wallet } = useWallet();
+    const [token, setToken] = useState<"eth" | "usdxm">("eth");
+    const [recipient, setRecipient] = useState("");
+    const [amount, setAmount] = useState("");
+    const [isLoading, setIsLoading] = useState(false);
+    const [txLink, setTxLink] = useState<string | null>(null);
+
+    async function handleTransfer() {
+        if (!wallet || !recipient || !amount) {
+            alert("Please fill in all fields");
+            return;
+        }
+
+        // Validate EVM address
+        if (!isAddress(recipient)) {
+            alert("Invalid recipient address");
+            return;
+        }
+
+        try {
+            setIsLoading(true);
+            const tx = await wallet.send(recipient, token, amount);
+            setTxLink(tx.explorerLink);
+        } catch (error) {
+            console.error("Transfer error:", error);
+            alert("Transfer failed: " + error.message);
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
+    return (
+        <div className="flex flex-col gap-3 p-5 bg-white rounded-xl border">
+            <h2 className="text-lg font-medium">Transfer funds</h2>
+            
+            {/* Token selection */}
+            <div className="flex gap-4">
+                <label className="flex items-center gap-2">
+                    <input
+                        type="radio"
+                        checked={token === "eth"}
+                        onChange={() => setToken("eth")}
+                    />
+                    <span>ETH</span>
+                </label>
+                <label className="flex items-center gap-2">
+                    <input
+                        type="radio"
+                        checked={token === "usdxm"}
+                        onChange={() => setToken("usdxm")}
+                    />
+                    <span>USDXM</span>
+                </label>
+            </div>
+
+            {/* Amount input */}
+            <input
+                type="number"
+                className="px-3 py-2 border rounded-md"
+                placeholder="0.00"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+            />
+
+            {/* Recipient input */}
+            <input
+                type="text"
+                className="px-3 py-2 border rounded-md"
+                placeholder="Recipient address"
+                value={recipient}
+                onChange={(e) => setRecipient(e.target.value)}
+            />
+
+            {/* Transfer button */}
+            <button
+                className="py-2 px-4 bg-blue-500 text-white rounded-md disabled:opacity-50"
+                onClick={handleTransfer}
+                disabled={isLoading}
+            >
+                {isLoading ? "Transferring..." : "Transfer"}
+            </button>
+
+            {/* Transaction link */}
+            {txLink && (
+                <a
+                    href={txLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-blue-500"
+                >
+                    View on Explorer
+                </a>
+            )}
+        </div>
+    );
+}
+```
+
+</CodeGroup>
+
+### Solana Transfer
+
+<CodeGroup>
+
+```tsx components/SolanaTransfer.tsx
+import { useState } from "react";
+import { useWallet } from "@crossmint/client-sdk-react-ui";
+import { PublicKey } from "@solana/web3.js";
+
+export function SolanaTransferFunds() {
+    const { wallet } = useWallet();
+    const [token, setToken] = useState<"sol" | "usdxm">("sol");
+    const [recipient, setRecipient] = useState("");
+    const [amount, setAmount] = useState("");
+    const [isLoading, setIsLoading] = useState(false);
+    const [txLink, setTxLink] = useState<string | null>(null);
+
+    const isValidSolanaAddress = (address: string) => {
+        try {
+            new PublicKey(address);
+            return true;
+        } catch {
+            return false;
+        }
+    };
+
+    async function handleTransfer() {
+        if (!wallet || !recipient || !amount) {
+            alert("Please fill in all fields");
+            return;
+        }
+
+        if (!isValidSolanaAddress(recipient)) {
+            alert("Invalid Solana address");
+            return;
+        }
+
+        try {
+            setIsLoading(true);
+            const tx = await wallet.send(recipient, token, amount);
+            setTxLink(tx.explorerLink);
+        } catch (error) {
+            console.error("Transfer error:", error);
+            alert("Transfer failed: " + error.message);
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
+    return (
+        <div className="flex flex-col gap-3 p-5 bg-white rounded-xl border">
+            <h2 className="text-lg font-medium">Transfer funds</h2>
+            
+            <div className="flex gap-4">
+                <label className="flex items-center gap-2">
+                    <input
+                        type="radio"
+                        checked={token === "sol"}
+                        onChange={() => setToken("sol")}
+                    />
+                    <span>SOL</span>
+                </label>
+                <label className="flex items-center gap-2">
+                    <input
+                        type="radio"
+                        checked={token === "usdxm"}
+                        onChange={() => setToken("usdxm")}
+                    />
+                    <span>USDXM</span>
+                </label>
+            </div>
+
+            <input
+                type="number"
+                className="px-3 py-2 border rounded-md"
+                placeholder="0.00"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+            />
+
+            <input
+                type="text"
+                className="px-3 py-2 border rounded-md"
+                placeholder="Recipient address"
+                value={recipient}
+                onChange={(e) => setRecipient(e.target.value)}
+            />
+
+            <button
+                className="py-2 px-4 bg-blue-500 text-white rounded-md disabled:opacity-50"
+                onClick={handleTransfer}
+                disabled={isLoading}
+            >
+                {isLoading ? "Transferring..." : "Transfer"}
+            </button>
+
+            {txLink && (
+                <a
+                    href={txLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-blue-500"
+                >
+                    View on Solscan
+                </a>
+            )}
+        </div>
+    );
+}
+```
+
+```ts Wallets SDK
+const transaction = await wallet.send(
+    "recipient-address",
+    "usdc",
+    "100"
+);
+
+console.log("Transaction:", transaction.explorerLink);
+```
+
+</CodeGroup>
+
+## Advanced Operations
+
+### Wallet Activity
+
+<CodeGroup>
+
+```ts
+const activity = await wallet.experimental_activity();
+
+console.log("Recent transactions:", activity.events);
+```
+
+</CodeGroup>
+
+### Delegated Signers
+
+Add external signers to your wallet:
+
+<CodeGroup>
+
+```ts
+// Add a delegated signer
+await wallet.addDelegatedSigner({ 
+    signer: "0x1234..." 
+});
+
+// Get all delegated signers
+const signers = await wallet.delegatedSigners();
+console.log("Delegated signers:", signers);
+```
+
+</CodeGroup>
+
+### Custom Transactions
+
+<CodeGroup>
+
+```ts Solana
+import { SolanaWallet } from "@crossmint/wallets-sdk";
+
+const solanaWallet = SolanaWallet.from(wallet);
+const tx = await solanaWallet.sendTransaction({ 
+    transaction: "<serialized-or-non-serialized-transaction>" 
+});
+
+console.log(tx.explorerLink);
+```
+
+```ts EVM
+import { EVMWallet } from "@crossmint/wallets-sdk";
+
+const evmWallet = EVMWallet.from(wallet);
+const tx = await evmWallet.sendTransaction({ 
+    transaction: "<serialized-or-non-serialized-transaction>" 
+});
+
+console.log(tx.explorerLink);
+```
+
+</CodeGroup>
+
+## Complete Example
+
+Here's a complete wallet management component:
+
+<CodeGroup>
+
+```tsx components/WalletManager.tsx
+import { useAuth, useWallet } from "@crossmint/client-sdk-react-ui";
+import { WalletBalance } from "./WalletBalance";
+import { EVMTransferFunds } from "./EVMTransfer";
+
+export function WalletManager() {
+    const { login, logout, user, status: authStatus } = useAuth();
+    const { wallet, status: walletStatus } = useWallet();
+
+    if (authStatus === "logged-out") {
+        return (
+            <div className="flex flex-col gap-4">
+                <h1>Login to access your wallet</h1>
+                <button onClick={login}>Login with Crossmint</button>
+            </div>
+        );
+    }
+
+    if (walletStatus === "in-progress") {
+        return <p>Loading wallet...</p>;
+    }
+
+    return (
+        <div className="flex flex-col gap-6">
+            <div>
+                <h1 className="text-2xl font-bold">Your Wallet</h1>
+                <p>User: {user?.email}</p>
+            </div>
+
+            {wallet && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Wallet info and balance */}
+                    <div className="p-5 bg-white rounded-xl border">
+                        <h2 className="text-lg font-medium mb-3">Wallet Info</h2>
+                        <p className="text-sm text-gray-500 mb-2">
+                            {wallet.address}
+                        </p>
+                        <WalletBalance />
+                        <button
+                            onClick={logout}
+                            className="mt-4 px-4 py-2 bg-red-500 text-white rounded"
+                        >
+                            Logout
+                        </button>
+                    </div>
+
+                    {/* Transfer component */}
+                    <EVMTransferFunds />
+                </div>
+            )}
+        </div>
+    );
+}
+```
+
+</CodeGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="lock" href="/concepts/authentication">
+    Learn about wallet authentication
+  </Card>
+  <Card title="Next.js Example" icon="react" href="/examples/nextjs-integration">
+    Full Next.js integration
+  </Card>
+  <Card title="React Native" icon="mobile" href="/examples/react-native-integration">
+    Build mobile wallet apps
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/client-sdk/react-hooks">
+    Explore the useWallet hook
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Wallet not loading">
+    - Verify your API key is correct
+    - Check that the user is authenticated
+    - Ensure the chain is supported
+  </Accordion>
+  
+  <Accordion title="Transfer failing">
+    - Verify the wallet has sufficient balance
+    - Check that the recipient address is valid
+    - Ensure the token is supported on the chain
+  </Accordion>
+  
+  <Accordion title="Balance not updating">
+    Balances may take a few seconds to update after transactions. Try refreshing the page or re-fetching the balance.
+  </Accordion>
+</AccordionGroup>

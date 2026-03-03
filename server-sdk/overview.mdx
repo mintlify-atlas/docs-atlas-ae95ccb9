@@ -1,0 +1,119 @@
+---
+title: 'Server SDK Overview'
+description: 'Authenticate users in server-side applications using the Crossmint Server SDK'
+---
+
+The Crossmint Server SDK provides a comprehensive set of tools for authenticating users in server-side rendered (SSR) applications. It simplifies the process of handling authentication tokens and managing user sessions, making it easier to integrate authentication into your Next.js, Express, or other Node.js applications.
+
+## Installation
+
+Install the SDK using npm or yarn:
+
+<CodeGroup>
+```bash npm
+npm install @crossmint/server-sdk
+```
+
+```bash yarn
+yarn add @crossmint/server-sdk
+```
+
+```bash pnpm
+pnpm add @crossmint/server-sdk
+```
+</CodeGroup>
+
+## Quick Start
+
+<Steps>
+  <Step title="Initialize the SDK">
+    Import and create a Crossmint instance with your API key:
+
+    ```ts
+    import { createCrossmint, CrossmintAuth } from "@crossmint/server-sdk";
+
+    const crossmint = createCrossmint({
+        apiKey: process.env.SERVER_CROSSMINT_API_KEY || "",
+    });
+
+    const crossmintAuth = CrossmintAuth.from(crossmint);
+    ```
+  </Step>
+
+  <Step title="Authenticate users">
+    Use the `getSession` method to retrieve user session information:
+
+    <CodeGroup>
+    ```ts Next.js
+    import { cookies } from "next/headers";
+
+    const cookieStore = cookies();
+    const jwtCookie = cookieStore.get("crossmint-session")?.value;
+    const refreshCookie = cookieStore.get("crossmint-refresh-token")?.value;
+
+    const { jwt, userId } = await crossmintAuth.getSession({
+        jwt: jwtCookie,
+        refreshToken: refreshCookie,
+    });
+    ```
+
+    ```ts Express
+    const { jwt, userId } = await crossmintAuth.getSession(request);
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Store authentication in cookies">
+    For frameworks with access to the response object, store authentication material in cookies:
+
+    ```ts
+    const { jwt, userId } = await crossmintAuth.getSession(request, response);
+    ```
+  </Step>
+</Steps>
+
+## Key Features
+
+### Automatic Token Refresh
+
+The SDK automatically validates and refreshes JWT tokens when they expire, ensuring seamless user sessions.
+
+### Secure Cookie Management
+
+Store authentication material in secure, HttpOnly cookies with customizable options for maximum security.
+
+### Framework Agnostic
+
+Works with any server-side JavaScript framework including Next.js, Express, Fastify, and more.
+
+### User Management
+
+Retrieve user information and manage authentication state across your application.
+
+## Core Classes and Methods
+
+### CrossmintAuth
+
+The main class for handling authentication operations:
+
+- `getSession()` - Retrieve and validate user sessions
+- `logout()` - Clear authentication state
+- `handleCustomRefresh()` - Handle token refresh requests
+- `getUser()` - Retrieve user information by external user ID
+- `verifyCrossmintJwt()` - Verify JWT tokens
+
+Source: `CrossmintAuthServer.ts:30`
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="shield-check" href="/server-sdk/authentication">
+    Learn how to authenticate users and manage sessions
+  </Card>
+  <Card title="Session Management" icon="clock-rotate-left" href="/server-sdk/session-management">
+    Handle session validation and token refresh
+  </Card>
+  <Card title="Custom Refresh Routes" icon="route" href="/server-sdk/custom-refresh-routes">
+    Set up custom refresh routes for enhanced security
+  </Card>
+</CardGroup>

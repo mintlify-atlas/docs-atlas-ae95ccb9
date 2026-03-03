@@ -1,0 +1,221 @@
+---
+title: "Introduction"
+description: "Welcome to Crossmint SDK - A comprehensive suite of tools for blockchain integration, authentication, wallets, and NFT functionality"
+---
+
+## What is Crossmint SDK?
+
+Crossmint SDK is a powerful suite of TypeScript libraries that enables developers to seamlessly integrate blockchain functionality into their applications. Whether you're building a Web3 app, adding wallet capabilities, or implementing decentralized authentication, Crossmint provides the tools you need.
+
+<CardGroup cols={2}>
+  <Card title="Wallets SDK" icon="wallet" href="/wallets-sdk/overview">
+    Create and manage multi-chain wallets on Solana and 20+ EVM chains
+  </Card>
+  
+  <Card title="Authentication" icon="lock" href="/concepts/authentication">
+    Implement secure client-side and server-side authentication flows
+  </Card>
+  
+  <Card title="React Components" icon="react" href="/client-sdk/react-ui">
+    Pre-built UI components for wallets, NFTs, and authentication
+  </Card>
+  
+  <Card title="Verifiable Credentials" icon="certificate" href="/client-sdk/verifiable-credentials">
+    Issue and verify decentralized credentials
+  </Card>
+</CardGroup>
+
+## Key Features
+
+<AccordionGroup>
+  <Accordion title="Multi-Chain Support" icon="link">
+    Build once, deploy everywhere. Crossmint supports:
+    - **Solana** - Native SOL and SPL tokens
+    - **20+ EVM Chains** - Ethereum, Polygon, Base, Arbitrum, Optimism, and more
+    - **Unified API** - Same code works across all supported chains
+  </Accordion>
+
+  <Accordion title="Flexible Authentication" icon="shield-check">
+    Multiple authentication methods out of the box:
+    - Email OTP (passwordless)
+    - Social logins (Google, Twitter/X, Farcaster)
+    - Web3 wallet connections
+    - Bring your own authentication system
+  </Accordion>
+
+  <Accordion title="Developer-First Design" icon="code">
+    Built with developer experience in mind:
+    - Type-safe TypeScript APIs
+    - Comprehensive documentation
+    - Real-world examples
+    - React hooks and components
+  </Accordion>
+
+  <Accordion title="Production Ready" icon="rocket">
+    Enterprise-grade security and reliability:
+    - Secure key management
+    - HttpOnly cookie support
+    - Custom storage providers
+    - Server-side rendering support
+  </Accordion>
+</AccordionGroup>
+
+## Core Packages
+
+### Wallets
+
+<Card title="@crossmint/wallets-sdk" icon="npm">
+  Create and manage custodial wallets programmatically. Supports wallet creation, balance checking, token transfers, and custom transactions on multiple chains.
+  
+  ```bash
+  npm install @crossmint/wallets-sdk
+  ```
+</Card>
+
+### Authentication
+
+<CardGroup cols={2}>
+  <Card title="@crossmint/client-sdk-auth" icon="npm">
+    Client-side authentication with support for cookies, React Native secure storage, and custom storage providers.
+  </Card>
+  
+  <Card title="@crossmint/server-sdk" icon="npm">
+    Server-side authentication for Next.js, Remix, and other SSR frameworks with HttpOnly cookie support.
+  </Card>
+</CardGroup>
+
+### React UI
+
+<Card title="@crossmint/client-sdk-react-ui" icon="npm">
+  Complete React SDK with providers, hooks, and pre-built components for authentication, wallets, and NFT display.
+  
+  ```bash
+  npm install @crossmint/client-sdk-react-ui
+  ```
+</Card>
+
+### Verifiable Credentials
+
+<Card title="@crossmint/client-sdk-verifiable-credentials" icon="npm">
+  Issue, verify, and manage decentralized verifiable credentials for identity and attestation use cases.
+</Card>
+
+## Quick Example
+
+Here's a taste of what you can build with Crossmint:
+
+<CodeGroup>
+```typescript React Component
+import { useAuth, useWallet } from "@crossmint/client-sdk-react-ui";
+
+export default function WalletDemo() {
+  const { login, user } = useAuth();
+  const { wallet } = useWallet();
+
+  if (!user) {
+    return <button onClick={login}>Sign In</button>;
+  }
+
+  return (
+    <div>
+      <p>Welcome {user.email}!</p>
+      <p>Wallet: {wallet?.address}</p>
+      <button onClick={() => wallet?.send(recipient, "usdc", "10")}>
+        Send 10 USDC
+      </button>
+    </div>
+  );
+}
+```
+
+```typescript Server-Side
+import { createCrossmint, CrossmintAuth } from "@crossmint/server-sdk";
+import { cookies } from "next/headers";
+
+const crossmint = createCrossmint({
+  apiKey: process.env.SERVER_CROSSMINT_API_KEY,
+});
+
+const crossmintAuth = CrossmintAuth.from(crossmint);
+
+const cookieStore = cookies();
+const { jwt, userId } = await crossmintAuth.getSession({
+  jwt: cookieStore.get("crossmint-session")?.value,
+  refreshToken: cookieStore.get("crossmint-refresh-token")?.value,
+});
+```
+
+```typescript Vanilla JavaScript
+import { CrossmintWallets, createCrossmint } from "@crossmint/wallets-sdk";
+
+const crossmint = createCrossmint({
+  apiKey: process.env.CROSSMINT_API_KEY,
+  experimental_customAuth: {
+    jwt: userJwt,
+  },
+});
+
+const crossmintWallets = CrossmintWallets.from(crossmint);
+const wallet = await crossmintWallets.getOrCreateWallet({
+  chain: "polygon-amoy",
+  signer: {
+    type: "email",
+    email: "user@example.com",
+  },
+});
+
+console.log("Wallet address:", wallet.address);
+```
+</CodeGroup>
+
+## Next Steps
+
+<Steps>
+  <Step title="Install the SDK">
+    Choose the packages that fit your use case and install them via npm, yarn, or pnpm.
+    
+    [Installation Guide →](/installation)
+  </Step>
+  
+  <Step title="Get Your API Key">
+    Sign up for a Crossmint account and get your API keys from the developer console.
+    
+    [Get API Keys →](https://www.crossmint.com/console/projects/apiKeys)
+  </Step>
+  
+  <Step title="Follow the Quickstart">
+    Build your first wallet-enabled application in under 5 minutes.
+    
+    [Quickstart Guide →](/quickstart)
+  </Step>
+  
+  <Step title="Explore Examples">
+    Check out our collection of example applications and code snippets.
+    
+    [View Examples →](https://www.crossmint.com/quickstarts)
+  </Step>
+</Steps>
+
+<Note>
+  **New to Web3?** Don't worry! Crossmint abstracts away the complexity of blockchain development. You don't need to understand gas fees, private keys, or transaction signing to get started.
+</Note>
+
+## Getting Help
+
+<CardGroup cols={2}>
+  <Card title="Documentation" icon="book" href="https://docs.crossmint.com">
+    Comprehensive guides and API references
+  </Card>
+  
+  <Card title="GitHub" icon="github" href="https://github.com/Crossmint/crossmint-sdk">
+    View source code and report issues
+  </Card>
+  
+  <Card title="Discord Community" icon="discord" href="https://discord.gg/crossmint">
+    Join our community for support and discussions
+  </Card>
+  
+  <Card title="Support" icon="life-ring" href="https://www.crossmint.com/support">
+    Contact our support team
+  </Card>
+</CardGroup>

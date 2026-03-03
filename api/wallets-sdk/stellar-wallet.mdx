@@ -1,0 +1,325 @@
+---
+title: "StellarWallet"
+description: "Stellar-specific wallet functionality"
+---
+
+The `StellarWallet` class extends the base `Wallet` class with Stellar-specific functionality for sending transactions and interacting with Stellar smart contracts.
+
+## Creating a Stellar Wallet
+
+### from()
+
+Create a StellarWallet instance from a base Wallet.
+
+```typescript
+static from(wallet: Wallet<Chain>): StellarWallet
+```
+
+<ParamField path="wallet" type="Wallet<Chain>" required>
+  A wallet instance with a Stellar address
+</ParamField>
+
+<ResponseField name="stellarWallet" type="StellarWallet">
+  A StellarWallet instance with Stellar-specific methods
+</ResponseField>
+
+#### Example
+
+```typescript
+import { StellarWallet } from "@crossmint/wallets";
+
+const wallet = await wallets.getOrCreateWallet({
+  chain: "stellar",
+  signer: {
+    type: "stellar-keypair",
+    secretKey: "S..."
+  }
+});
+
+const stellarWallet = StellarWallet.from(wallet);
+```
+
+## Transaction Methods
+
+### sendTransaction()
+
+Send a raw Stellar transaction. Supports two formats: serialized transaction or contract call.
+
+```typescript
+public async sendTransaction<T extends TransactionInputOptions | undefined = undefined>(
+  params: StellarTransactionInput & { options?: T }
+): Promise<Transaction<T extends PrepareOnly<true> ? true : false>>
+```
+
+<ParamField path="params" type="StellarTransactionInput" required>
+  Transaction parameters (multiple formats supported)
+  
+  <Expandable title="Format 1: Contract Call">
+    <ParamField path="contractId" type="string" required>
+      Stellar smart contract ID
+    </ParamField>
+    <ParamField path="method" type="string" required>
+      Contract method name to call
+    </ParamField>
+    <ParamField path="args" type="Record<string, any>" required>
+      Method arguments as key-value pairs
+    </ParamField>
+    <ParamField path="memo" type="string">
+      Optional transaction memo
+    </ParamField>
+    <ParamField path="options" type="TransactionInputOptions">
+      Transaction options
+      
+      <Expandable title="properties">
+        <ParamField path="experimental_prepareOnly" type="boolean">
+          If true, returns transaction ID without auto-approving
+        </ParamField>
+        <ParamField path="experimental_signer" type="string">
+          Custom signer locator
+        </ParamField>
+      </Expandable>
+    </ParamField>
+  </Expandable>
+  
+  <Expandable title="Format 2: Serialized Transaction">
+    <ParamField path="transaction" type="string" required>
+      Base64-encoded serialized Stellar transaction
+    </ParamField>
+    <ParamField path="contractId" type="string" required>
+      Stellar smart contract ID
+    </ParamField>
+    <ParamField path="options" type="TransactionInputOptions">
+      Transaction options
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ResponseField name="transaction" type="Transaction">
+  The transaction result
+  
+  <Expandable title="properties">
+    <ResponseField name="hash" type="string">
+      Transaction hash (undefined if prepareOnly)
+    </ResponseField>
+    <ResponseField name="explorerLink" type="string">
+      Stellar Explorer link (undefined if prepareOnly)
+    </ResponseField>
+    <ResponseField name="transactionId" type="string">
+      Internal transaction ID
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+#### Examples
+
+```typescript
+// Example 1: Call a contract method
+const result = await stellarWallet.sendTransaction({
+  contractId: "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4",
+  method: "transfer",
+  args: {
+    to: "GCEXAMPLE...",
+    amount: 1000000 // Amount in stroops (1 XLM = 10,000,000 stroops)
+  }
+});
+
+console.log("Transaction hash:", result.hash);
+console.log("Explorer:", result.explorerLink);
+
+// Example 2: Call with memo
+const result2 = await stellarWallet.sendTransaction({
+  contractId: "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4",
+  method: "mint",
+  memo: "Minting NFT #123",
+  args: {
+    recipient: "GCEXAMPLE...",
+    tokenId: 123
+  }
+});
+
+// Example 3: Send pre-serialized transaction
+const result3 = await stellarWallet.sendTransaction({
+  transaction: "AAAAAgAAAAD...", // Base64 serialized transaction
+  contractId: "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4"
+});
+
+// Example 4: Prepare only (don't auto-approve)
+const result4 = await stellarWallet.sendTransaction({
+  contractId: "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4",
+  method: "transfer",
+  args: {
+    to: "GCEXAMPLE...",
+    amount: 1000000
+  },
+  options: { experimental_prepareOnly: true }
+});
+
+console.log("Transaction ID:", result4.transactionId);
+// Later: await stellarWallet.approve({ transactionId: result4.transactionId });
+```
+
+## Working with Stellar Contracts
+
+### Calling Contract Methods
+
+You can interact with Stellar smart contracts by specifying the contract ID, method name, and arguments.
+
+```typescript
+// Example: Token transfer
+const tokenTransfer = await stellarWallet.sendTransaction({
+  contractId: "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4",
+  method: "transfer",
+  args: {
+    from: stellarWallet.address,
+    to: "GCEXAMPLE5IVGI4XQCZCMWPZ3YLO5HI7D4ZFHQB7JV4S3H7UXJFL6NQC",
+    amount: 10000000 // 1 token (assuming 7 decimals)
+  }
+});
+
+// Example: NFT minting
+const nftMint = await stellarWallet.sendTransaction({
+  contractId: "CNFT...",
+  method: "mint",
+  memo: "NFT Collection #1",
+  args: {
+    to: stellarWallet.address,
+    tokenId: 1,
+    metadata: {
+      name: "My NFT",
+      description: "A unique digital asset",
+      image: "https://example.com/nft/1.png"
+    }
+  }
+});
+
+// Example: Query contract state (read-only)
+const balance = await stellarWallet.sendTransaction({
+  contractId: "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4",
+  method: "balance",
+  args: {
+    account: stellarWallet.address
+  }
+});
+```
+
+## Contract Argument Types
+
+When calling contract methods, arguments should match the expected types:
+
+```typescript
+// Common argument types
+const exampleArgs = {
+  // Addresses
+  address: "GCEXAMPLE...",
+  
+  // Numbers (use strings for large numbers to avoid precision loss)
+  amount: 1000000,
+  bigAmount: "1000000000000",
+  
+  // Strings
+  message: "Hello, Stellar!",
+  
+  // Booleans
+  enabled: true,
+  
+  // Objects
+  metadata: {
+    key: "value",
+    nested: {
+      data: 123
+    }
+  },
+  
+  // Arrays
+  recipients: [
+    "GCEXAMPLE1...",
+    "GCEXAMPLE2..."
+  ]
+};
+
+await stellarWallet.sendTransaction({
+  contractId: "CONTRACT_ID",
+  method: "batchTransfer",
+  args: exampleArgs
+});
+```
+
+## Inherited Methods
+
+StellarWallet inherits all methods from the base [Wallet](/api/wallets-sdk/wallet) class:
+
+- `balances()` - Get token balances (XLM, USDC, and other tokens)
+- `send()` - Send tokens (simplified high-level API)
+- `approve()` - Approve transactions
+- `addDelegatedSigner()` - Add delegated signers
+- `delegatedSigners()` - List delegated signers
+- `stagingFund()` - Fund wallet (staging only)
+- All experimental methods
+
+### Using High-Level send() Method
+
+For simple token transfers, you can use the inherited `send()` method:
+
+```typescript
+// Send XLM
+const tx = await stellarWallet.send(
+  "GCEXAMPLE5IVGI4XQCZCMWPZ3YLO5HI7D4ZFHQB7JV4S3H7UXJFL6NQC",
+  "xlm", // Token symbol
+  "10.5" // Amount in XLM
+);
+
+// Send USDC
+const tx2 = await stellarWallet.send(
+  "GCEXAMPLE5IVGI4XQCZCMWPZ3YLO5HI7D4ZFHQB7JV4S3H7UXJFL6NQC",
+  "usdc",
+  "50.00" // Amount in USDC
+);
+
+// Send to email
+const tx3 = await stellarWallet.send(
+  { email: "user@example.com" },
+  "xlm",
+  "5.0"
+);
+```
+
+## Stellar-Specific Considerations
+
+### Memo Fields
+
+Stellar supports transaction memos for attaching messages or identifiers:
+
+```typescript
+const txWithMemo = await stellarWallet.sendTransaction({
+  contractId: "CONTRACT_ID",
+  method: "transfer",
+  memo: "Payment for invoice #12345",
+  args: {
+    to: "GCEXAMPLE...",
+    amount: 1000000
+  }
+});
+```
+
+### Stroops and Decimals
+
+Stellar uses stroops as the smallest unit (1 XLM = 10,000,000 stroops). When working with raw amounts:
+
+```typescript
+const ONE_XLM = 10_000_000; // stroops
+
+await stellarWallet.sendTransaction({
+  contractId: "CONTRACT_ID",
+  method: "transfer",
+  args: {
+    to: "GCEXAMPLE...",
+    amount: 0.5 * ONE_XLM // 0.5 XLM
+  }
+});
+```
+
+## Related Types
+
+- [CrossmintWallets](/api/wallets-sdk/crossmint-wallets) - SDK initialization
+- [Wallet](/api/wallets-sdk/wallet) - Base wallet class
+- [Types](/api/wallets-sdk/types) - Type definitions

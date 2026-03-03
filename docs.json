@@ -1,122 +1,131 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "Crossmint SDK",
+  "theme": "palm",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#0066FF",
+    "light": "#4D94FF",
+    "dark": "#0052CC"
   },
-  "favicon": "/favicon.svg",
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/Crossmint/crossmint-sdk"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/Crossmint/crossmint-sdk"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Getting Started",
             "pages": [
-              "index",
-              "quickstart",
-              "development"
+              "introduction",
+              "installation",
+              "quickstart"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Concepts",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "concepts/authentication",
+              "concepts/wallets",
+              "concepts/chains",
+              "concepts/signers"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Wallets SDK",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "wallets-sdk/overview",
+              "wallets-sdk/getting-started",
+              "wallets-sdk/wallet-operations",
+              "wallets-sdk/evm-wallets",
+              "wallets-sdk/solana-wallets",
+              "wallets-sdk/stellar-wallets",
+              "wallets-sdk/delegated-signers"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Client SDKs",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "client-sdk/overview",
+              "client-sdk/react-ui",
+              "client-sdk/react-native-ui",
+              "client-sdk/auth",
+              "client-sdk/verifiable-credentials"
+            ]
+          },
+          {
+            "group": "Server SDK",
+            "pages": [
+              "server-sdk/overview",
+              "server-sdk/authentication",
+              "server-sdk/session-management",
+              "server-sdk/custom-refresh-routes"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/nft-checkout",
+              "guides/embedded-wallets",
+              "guides/credit-card-payments",
+              "guides/multi-chain-support",
+              "guides/custom-transactions"
+            ]
+          },
+          {
+            "group": "Examples",
+            "pages": [
+              "examples/nextjs-integration",
+              "examples/react-native-integration",
+              "examples/server-side-auth",
+              "examples/wallet-creation"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Wallets SDK",
             "pages": [
-              "api-reference/introduction"
+              "api/wallets-sdk/crossmint-wallets",
+              "api/wallets-sdk/wallet",
+              "api/wallets-sdk/evm-wallet",
+              "api/wallets-sdk/solana-wallet",
+              "api/wallets-sdk/stellar-wallet",
+              "api/wallets-sdk/types"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Client SDK",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api/client-sdk/crossmint-auth",
+              "api/client-sdk/react-components",
+              "api/client-sdk/react-hooks",
+              "api/client-sdk/react-providers",
+              "api/client-sdk/verifiable-credentials"
+            ]
+          },
+          {
+            "group": "Server SDK",
+            "pages": [
+              "api/server-sdk/crossmint-auth",
+              "api/server-sdk/session-methods",
+              "api/server-sdk/configuration"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

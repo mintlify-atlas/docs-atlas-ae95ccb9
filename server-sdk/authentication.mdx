@@ -1,0 +1,203 @@
+---
+title: 'Authentication'
+description: 'Authenticate users and retrieve session information using the Server SDK'
+---
+
+The Crossmint Server SDK provides flexible authentication methods that work across different server-side frameworks.
+
+## Initializing CrossmintAuth
+
+Before authenticating users, initialize the `CrossmintAuth` class:
+
+```ts
+import { createCrossmint, CrossmintAuth } from "@crossmint/server-sdk";
+
+const crossmint = createCrossmint({
+    apiKey: process.env.SERVER_CROSSMINT_API_KEY || "",
+});
+
+const crossmintAuth = CrossmintAuth.from(crossmint);
+```
+
+<Warning>
+  Store your API key in environment variables and never commit it to version control.
+</Warning>
+
+## Getting User Sessions
+
+The `getSession()` method validates JWT tokens and automatically refreshes them when expired.
+
+### Next.js App Router
+
+In Next.js, fetch cookies and pass them to the `getSession` method:
+
+```ts
+import { cookies } from "next/headers";
+
+const cookieStore = cookies();
+const jwtCookie = cookieStore.get("crossmint-session")?.value;
+const refreshCookie = cookieStore.get("crossmint-refresh-token")?.value;
+
+const { jwt, userId } = await crossmintAuth.getSession({
+    jwt: jwtCookie,
+    refreshToken: refreshCookie,
+});
+```
+
+Source: `README.md:38`
+
+### Express and Other Frameworks
+
+For frameworks with access to the request object, pass it directly:
+
+```ts
+const { jwt, userId } = await crossmintAuth.getSession(request);
+```
+
+Source: `README.md:34`
+
+## Storing Authentication Material
+
+### Automatic Cookie Storage
+
+For frameworks with access to the response object, pass it to `getSession()` to automatically store authentication material in cookies:
+
+```ts
+const { jwt, userId } = await crossmintAuth.getSession(request, response);
+```
+
+This automatically stores the JWT and refresh token in cookies with the configured options.
+
+Source: `README.md:57`
+
+### Manual Cookie Storage
+
+You can also manually store authentication material using the `storeAuthMaterial()` method:
+
+```ts
+const authMaterial = {
+    jwt: "your-jwt-token",
+    refreshToken: {
+        secret: "your-refresh-token",
+        expiresAt: "2024-12-31T23:59:59Z"
+    }
+};
+
+crossmintAuth.storeAuthMaterial(response, authMaterial);
+```
+
+Source: `CrossmintAuthServer.ts:137`
+
+## Retrieving User Information
+
+Fetch detailed user information using the external user ID:
+
+```ts
+const user = await crossmintAuth.getUser(userId);
+```
+
+Source: `CrossmintAuthServer.ts:68`
+
+## Verifying JWT Tokens
+
+Manually verify JWT tokens using the `verifyCrossmintJwt()` method:
+
+```ts
+const decodedToken = await crossmintAuth.verifyCrossmintJwt(jwt);
+```
+
+You can also provide a custom JWKS (JSON Web Key Set):
+
+```ts
+const decodedToken = await crossmintAuth.verifyCrossmintJwt(jwt, customJwks);
+```
+
+Source: `CrossmintAuthServer.ts:130`
+
+## Error Handling
+
+The SDK throws `CrossmintAuthenticationError` when authentication fails:
+
+```ts
+try {
+    const { jwt, userId } = await crossmintAuth.getSession(request, response);
+    // Authentication successful
+} catch (error) {
+    if (error instanceof CrossmintAuthenticationError) {
+        // Handle authentication error
+        console.error("Authentication failed:", error.message);
+    }
+}
+```
+
+<Warning>
+  Always handle authentication errors gracefully to provide a good user experience. The SDK automatically clears cookies when authentication fails.
+</Warning>
+
+## Complete Example
+
+<CodeGroup>
+```ts Next.js API Route
+import { createCrossmint, CrossmintAuth } from "@crossmint/server-sdk";
+import { cookies } from "next/headers";
+import { NextRequest, NextResponse } from "next/server";
+
+const crossmint = createCrossmint({
+    apiKey: process.env.SERVER_CROSSMINT_API_KEY || "",
+});
+
+const crossmintAuth = CrossmintAuth.from(crossmint);
+
+export async function GET(request: NextRequest) {
+    try {
+        const cookieStore = cookies();
+        const jwtCookie = cookieStore.get("crossmint-session")?.value;
+        const refreshCookie = cookieStore.get("crossmint-refresh-token")?.value;
+
+        const { jwt, userId } = await crossmintAuth.getSession({
+            jwt: jwtCookie,
+            refreshToken: refreshCookie,
+        });
+
+        const user = await crossmintAuth.getUser(userId);
+
+        return NextResponse.json({ user });
+    } catch (error) {
+        return NextResponse.json(
+            { error: "Authentication failed" },
+            { status: 401 }
+        );
+    }
+}
+```
+
+```ts Express
+import express from "express";
+import { createCrossmint, CrossmintAuth } from "@crossmint/server-sdk";
+
+const app = express();
+
+const crossmint = createCrossmint({
+    apiKey: process.env.SERVER_CROSSMINT_API_KEY || "",
+});
+
+const crossmintAuth = CrossmintAuth.from(crossmint);
+
+app.get("/api/user", async (req, res) => {
+    try {
+        const { jwt, userId } = await crossmintAuth.getSession(req, res);
+        const user = await crossmintAuth.getUser(userId);
+        
+        res.json({ user });
+    } catch (error) {
+        res.status(401).json({ error: "Authentication failed" });
+    }
+});
+```
+</CodeGroup>
+
+## Next Steps
+
+<Card title="Session Management" icon="clock-rotate-left" href="/server-sdk/session-management">
+  Learn how to handle session validation and token refresh
+</Card>

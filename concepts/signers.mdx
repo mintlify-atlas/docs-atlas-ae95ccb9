@@ -1,0 +1,476 @@
+---
+title: Signers
+description: Configure authentication and signing methods for Crossmint wallets
+---
+
+# Signers
+
+Signers control how users authenticate and authorize transactions in Crossmint wallets. The SDK supports multiple signer types, from email/phone-based authentication to external wallet connections and passkeys.
+
+## Signer Types
+
+Every wallet requires a signer configuration that determines how the user proves ownership and signs transactions.
+
+```typescript
+// Email signer
+const wallet = await crossmint.wallets.get({
+  chain: "base",
+  signer: {
+    type: "email",
+    email: "user@example.com"
+  }
+});
+```
+
+## Email Signers
+
+Email-based authentication using OTP (one-time password) verification.
+
+### Configuration
+
+```typescript
+import { EmailSignerConfig } from "@crossmint/client-sdk-wallets";
+
+const emailSigner: EmailSignerConfig = {
+  type: "email",
+  email: "user@example.com",
+  onAuthRequired: async (needsAuth, sendOtp, verifyOtp, reject) => {
+    if (needsAuth) {
+      // Send OTP to email
+      await sendOtp();
+      
+      // Get OTP from user (your UI logic)
+      const otp = await promptUserForOtp();
+      
+      // Verify the OTP
+      try {
+        await verifyOtp(otp);
+      } catch (error) {
+        console.error("Invalid OTP");
+        reject();
+      }
+    }
+  }
+};
+
+const wallet = await crossmint.wallets.get({
+  chain: "base",
+  signer: emailSigner
+});
+```
+
+### Type Definition
+
+From source code (`packages/wallets/src/signers/types.ts:34-43`):
+
+```typescript
+export type EmailSignerConfig = {
+  type: "email";
+  email?: string;
+  onAuthRequired?: (
+    needsAuth: boolean,
+    sendEmailWithOtp: () => Promise<void>,
+    verifyOtp: (otp: string) => Promise<void>,
+    reject: () => void
+  ) => Promise<void>;
+};
+```
+
+<Note>
+Email signers are **non-custodial**. The private key is encrypted and can only be decrypted by proving ownership of the email through OTP verification.
+</Note>
+
+## Phone Signers
+
+Phone number-based authentication using SMS OTP verification.
+
+### Configuration
+
+```typescript
+import { PhoneSignerConfig } from "@crossmint/client-sdk-wallets";
+
+const phoneSigner: PhoneSignerConfig = {
+  type: "phone",
+  phone: "+1234567890",
+  onAuthRequired: async (needsAuth, sendOtp, verifyOtp, reject) => {
+    if (needsAuth) {
+      await sendOtp();
+      const otp = await promptUserForOtp();
+      await verifyOtp(otp);
+    }
+  }
+};
+
+const wallet = await crossmint.wallets.get({
+  chain: "base",
+  signer: phoneSigner
+});
+```
+
+### Type Definition
+
+From source code (`packages/wallets/src/signers/types.ts:45-54`):
+
+```typescript
+export type PhoneSignerConfig = {
+  type: "phone";
+  phone?: string;
+  onAuthRequired?: (
+    needsAuth: boolean,
+    sendEmailWithOtp: () => Promise<void>,
+    verifyOtp: (otp: string) => Promise<void>,
+    reject: () => void
+  ) => Promise<void>;
+};
+```
+
+## External Wallet Signers
+
+Connect existing crypto wallets (MetaMask, Phantom, etc.) to sign transactions.
+
+### EVM External Wallets
+
+Connect EVM wallets like MetaMask, Coinbase Wallet, WalletConnect, etc.
+
+```typescript
+import { EvmExternalWalletSignerConfig } from "@crossmint/client-sdk-wallets";
+
+const externalSigner: EvmExternalWalletSignerConfig = {
+  type: "external-wallet",
+  address: "0x123...", // Connected wallet address
+  onSignMessage: async (message: string) => {
+    // Sign with MetaMask or other provider
+    const signature = await window.ethereum.request({
+      method: "personal_sign",
+      params: [message, address]
+    });
+    return { signature };
+  },
+  onSignTransaction: async (transaction: string) => {
+    // Sign transaction
+    const signature = await provider.send("eth_signTransaction", [transaction]);
+    return { signature };
+  }
+};
+
+const wallet = await crossmint.wallets.get({
+  chain: "base",
+  signer: externalSigner
+});
+```
+
+<Info>
+External wallet signers use the connected wallet's private key to sign transactions. The wallet itself remains under the user's control.
+</Info>
+
+### Solana External Wallets
+
+Connect Solana wallets like Phantom, Solflare, etc.
+
+```typescript
+import { SolanaExternalWalletSignerConfig } from "@crossmint/client-sdk-wallets";
+
+const solanaSigner: SolanaExternalWalletSignerConfig = {
+  type: "external-wallet",
+  address: "Abc123...",
+  onSignMessage: async (message: string) => {
+    const encodedMessage = new TextEncoder().encode(message);
+    const signature = await window.solana.signMessage(encodedMessage);
+    return { signature: bs58.encode(signature.signature) };
+  },
+  onSignTransaction: async (transaction: string) => {
+    const tx = Transaction.from(bs58.decode(transaction));
+    const signed = await window.solana.signTransaction(tx);
+    return { signature: bs58.encode(signed.signature) };
+  }
+};
+
+const wallet = await crossmint.wallets.get({
+  chain: "solana",
+  signer: solanaSigner
+});
+```
+
+### Stellar External Wallets
+
+Connect Stellar wallets for Stellar network transactions.
+
+```typescript
+import { StellarExternalWalletSignerConfig } from "@crossmint/client-sdk-wallets";
+
+const stellarSigner: StellarExternalWalletSignerConfig = {
+  type: "external-wallet",
+  address: "GABC123...",
+  onSignMessage: async (message: string) => {
+    // Stellar wallet signing logic
+    return { signature };
+  },
+  onSignTransaction: async (transaction: string) => {
+    // Sign Stellar transaction
+    return { signature };
+  }
+};
+
+const wallet = await crossmint.wallets.get({
+  chain: "stellar",
+  signer: stellarSigner
+});
+```
+
+## Passkey Signers
+
+Use WebAuthn passkeys (biometric authentication, hardware keys) for signing. **Only available for EVM chains.**
+
+```typescript
+import { PasskeySignerConfig } from "@crossmint/client-sdk-wallets";
+
+const passkeySigner: PasskeySignerConfig = {
+  type: "passkey",
+  name: "My Hardware Key",
+  onCreatePasskey: async (name: string) => {
+    // Create passkey using WebAuthn API
+    const credential = await navigator.credentials.create({
+      publicKey: {
+        // WebAuthn options
+      }
+    });
+    
+    return {
+      id: credential.id,
+      publicKey: {
+        x: "...", // P-256 public key X coordinate
+        y: "..."  // P-256 public key Y coordinate
+      }
+    };
+  },
+  onSignWithPasskey: async (message: string) => {
+    // Sign with passkey
+    const assertion = await navigator.credentials.get({
+      publicKey: {
+        challenge: new TextEncoder().encode(message)
+      }
+    });
+    
+    return {
+      signature: {
+        r: "...",
+        s: "..."
+      },
+      metadata: {
+        // WebAuthn metadata
+      }
+    };
+  }
+};
+
+const wallet = await crossmint.wallets.get({
+  chain: "base",
+  signer: passkeySigner
+});
+```
+
+<Note>
+Passkeys use the P-256 elliptic curve and return a different signature format than other signers.
+</Note>
+
+Type definition (`packages/wallets/src/signers/types.ts:68-73`):
+
+```typescript
+export type PasskeySignerConfig = {
+  type: "passkey";
+  name?: string;
+  onCreatePasskey?: (name: string) => Promise<{ id: string; publicKey: { x: string; y: string } }>;
+  onSignWithPasskey?: (message: string) => Promise<PasskeySignResult>;
+};
+```
+
+## API Key Signers
+
+**Server-side only**. Use API keys to sign transactions programmatically without user interaction.
+
+```typescript
+import { createCrossmint } from "@crossmint/server-sdk-base";
+
+const crossmint = createCrossmint({
+  apiKey: "server-api-key" // Server API key with signing permissions
+});
+
+const wallet = await crossmint.wallets.get(
+  "0x123...", // Wallet address
+  {
+    chain: "base",
+    signer: { type: "api-key" }
+  }
+);
+
+// Transactions are automatically signed
+const tx = await wallet.send("0x456...", "usdc", "10");
+```
+
+<Note>
+API key signers bypass user authentication and automatically approve all transactions. Use with caution and only in trusted server environments.
+</Note>
+
+## Delegated Signers
+
+Add additional signers to a wallet for multi-signature functionality. Delegated signers can authorize transactions alongside the primary signer.
+
+### Adding Delegated Signers
+
+```typescript
+// Add an external wallet as delegated signer
+await wallet.addDelegatedSigner({
+  signer: "0xdelegated..."
+});
+
+// For EVM chains, you can also add a passkey
+await wallet.addDelegatedSigner({
+  signer: {
+    name: "Backup Key",
+    publicKey: {
+      x: "...",
+      y: "..."
+    }
+  }
+});
+
+// List all delegated signers
+const signers = await wallet.delegatedSigners();
+console.log(signers); // [{ signer: "external-wallet:0xdelegated..." }]
+```
+
+### Using Delegated Signers
+
+```typescript
+import { EVMExternalWalletSigner } from "@crossmint/client-sdk-wallets";
+
+// Create signer instance
+const delegatedSigner = new EVMExternalWalletSigner({
+  type: "external-wallet",
+  address: "0xdelegated...",
+  locator: "external-wallet:0xdelegated...",
+  onSignMessage: async (message) => {
+    // Sign with delegated wallet
+    return { signature };
+  },
+  onSignTransaction: async (tx) => {
+    return { signature };
+  }
+});
+
+// Use additional signer for transaction approval
+await wallet.approve({
+  transactionId: "tx_123...",
+  options: {
+    additionalSigners: [delegatedSigner]
+  }
+});
+```
+
+<Info>
+Delegated signers enable multi-sig wallets, social recovery, and shared wallet access patterns.
+</Info>
+
+## Signer Interface
+
+All signers implement the `Signer` interface:
+
+```typescript
+// From packages/wallets/src/signers/types.ts:142-148
+
+export interface Signer<T extends keyof SignResultMap = keyof SignResultMap> {
+  type: T;
+  locator(): string;
+  address?(): string;
+  signMessage(message: string): Promise<SignResultMap[T]>;
+  signTransaction(transaction: string): Promise<SignResultMap[T]>;
+}
+```
+
+### Exportable Signers
+
+Some signers (email, phone) support private key export:
+
+```typescript
+import { isExportableSigner } from "@crossmint/client-sdk-wallets";
+
+if (isExportableSigner(wallet.signer)) {
+  // This signer can export its private key
+  await wallet.signer._exportPrivateKey(exportConnection);
+}
+```
+
+<Note>
+External wallet signers and API key signers are **not exportable** since they don't manage private keys directly.
+</Note>
+
+## Signer Locators
+
+Each signer has a unique locator identifier:
+
+- Email: `email:user@example.com`
+- Phone: `phone:+1234567890`
+- External wallet: `external-wallet:0x123...`
+- Passkey: `passkey:credential_id`
+- API key: `api-key:wallet_address`
+
+```typescript
+const locator = wallet.signer.locator();
+console.log(locator); // "email:user@example.com"
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Email/Phone for Onboarding" icon="envelope">
+    Email and phone signers provide the best user experience for Web3 newcomers.
+  </Card>
+  
+  <Card title="Add Delegated Signers for Recovery" icon="shield-check">
+    Configure backup signers to prevent wallet lockout if primary signer is lost.
+  </Card>
+  
+  <Card title="Use Passkeys for Security" icon="fingerprint">
+    Passkeys provide hardware-backed security with biometric authentication.
+  </Card>
+  
+  <Card title="API Keys Only on Server" icon="server">
+    Never expose API key signers in client-side code.
+  </Card>
+</CardGroup>
+
+## Error Handling
+
+```typescript
+import { AuthRejectedError } from "@crossmint/client-sdk-wallets";
+
+try {
+  const wallet = await crossmint.wallets.get({
+    chain: "base",
+    signer: {
+      type: "email",
+      email: "user@example.com",
+      onAuthRequired: async (needsAuth, sendOtp, verifyOtp, reject) => {
+        // User cancelled authentication
+        reject();
+      }
+    }
+  });
+} catch (error) {
+  if (error instanceof AuthRejectedError) {
+    console.log("User cancelled authentication");
+  }
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" href="/concepts/authentication" icon="lock">
+    Learn about JWT sessions and OAuth flows
+  </Card>
+  
+  <Card title="Create Wallets" href="/concepts/wallets" icon="wallet">
+    Start creating wallets with different signer types
+  </Card>
+</CardGroup>

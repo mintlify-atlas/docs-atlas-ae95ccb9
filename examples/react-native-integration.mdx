@@ -1,0 +1,526 @@
+---
+title: React Native Integration
+description: Build mobile apps with Crossmint authentication and wallets using React Native and Expo
+---
+
+# React Native Integration
+
+This guide shows you how to integrate Crossmint authentication and wallets into your React Native mobile application using Expo.
+
+## Demo Repository
+
+<Card title="Wallets Expo Quickstart" icon="github" href="https://github.com/Crossmint/wallets-expo-quickstart">
+  Complete React Native example with Crossmint Auth and Wallets
+</Card>
+
+## Prerequisites
+
+- Node.js 18+
+- Expo CLI
+- A Crossmint API key ([Get one here](https://console.crossmint.com/))
+
+## Installation
+
+Install the required packages:
+
+```bash
+npm install @crossmint/client-sdk-react-native-ui expo-secure-store expo-web-browser expo-device
+```
+
+<Note>
+  The React Native SDK uses Expo's SecureStore for encrypted storage of authentication tokens, providing platform-native secure storage.
+</Note>
+
+## Environment Setup
+
+Create a `.env` file:
+
+```bash
+EXPO_PUBLIC_CROSSMINT_API_KEY=your_api_key_here
+```
+
+### Configure Deep Linking
+
+Add deep linking configuration to your `app.json`:
+
+```json app.json
+{
+  "expo": {
+    "name": "Your App",
+    "slug": "your-app",
+    "scheme": "your-app-scheme",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "platforms": ["ios", "android"]
+  }
+}
+```
+
+## Implementation
+
+### Option 1: With Crossmint Authentication (Recommended)
+
+This approach uses Crossmint's built-in authentication system.
+
+<CodeGroup>
+
+```tsx App.tsx
+import {
+  CrossmintProvider,
+  CrossmintAuthProvider,
+  CrossmintWalletProvider
+} from "@crossmint/client-sdk-react-native-ui";
+
+export default function App() {
+  return (
+    <CrossmintProvider apiKey={process.env.EXPO_PUBLIC_CROSSMINT_API_KEY}>
+      <CrossmintAuthProvider>
+        <CrossmintWalletProvider
+          createOnLogin={{
+            chain: "solana",
+            signer: { type: "email" }
+          }}
+          headlessSigningFlow={false}
+        >
+          <MainApp />
+        </CrossmintWalletProvider>
+      </CrossmintAuthProvider>
+    </CrossmintProvider>
+  );
+}
+```
+
+```tsx MainApp.tsx
+import { View, Button, Text } from "react-native";
+import { useCrossmintAuth, useWallet } from "@crossmint/client-sdk-react-native-ui";
+
+export default function MainApp() {
+  const { loginWithOAuth, logout, user } = useCrossmintAuth();
+  const { wallet, status } = useWallet();
+
+  if (!user) {
+    return (
+      <View style={{ padding: 20 }}>
+        <Button
+          title="Login with Google"
+          onPress={() => loginWithOAuth("google")}
+        />
+        <Button
+          title="Login with Twitter"
+          onPress={() => loginWithOAuth("twitter")}
+        />
+      </View>
+    );
+  }
+
+  if (status === "loaded") {
+    return (
+      <View style={{ padding: 20 }}>
+        <Text>Welcome {user.email}!</Text>
+        <Text>Wallet: {wallet?.address}</Text>
+        <Button
+          title="Send 1 USDC"
+          onPress={() => wallet?.send(recipient, "usdc", "1.0")}
+        />
+        <Button title="Logout" onPress={logout} />
+      </View>
+    );
+  }
+
+  return <Text>Loading wallet...</Text>;
+}
+```
+
+</CodeGroup>
+
+### Option 2: Bring Your Own Authentication
+
+If you already have an authentication system, you can skip Crossmint Auth:
+
+<CodeGroup>
+
+```tsx App.tsx
+import {
+  CrossmintProvider,
+  CrossmintWalletProvider
+} from "@crossmint/client-sdk-react-native-ui";
+
+export default function App() {
+  return (
+    <CrossmintProvider apiKey={process.env.EXPO_PUBLIC_CROSSMINT_API_KEY}>
+      {/* No CrossmintAuthProvider needed! */}
+      <CrossmintWalletProvider>
+        <MainApp />
+      </CrossmintWalletProvider>
+    </CrossmintProvider>
+  );
+}
+```
+
+</CodeGroup>
+
+<Note>
+  For complete custom authentication setup, see the [Authentication Guide](/concepts/authentication).
+</Note>
+
+## Authentication
+
+### OAuth Login
+
+Implement OAuth login with multiple providers:
+
+<CodeGroup>
+
+```tsx LoginScreen.tsx
+import { View, Button, StyleSheet } from "react-native";
+import { useCrossmintAuth } from "@crossmint/client-sdk-react-native-ui";
+
+export default function LoginScreen() {
+  const { loginWithOAuth } = useCrossmintAuth();
+
+  return (
+    <View style={styles.container}>
+      <Button
+        title="Login with Google"
+        onPress={() => loginWithOAuth("google")}
+      />
+      <Button
+        title="Login with Twitter"
+        onPress={() => loginWithOAuth("twitter")}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: "center",
+    padding: 20,
+    gap: 10,
+  },
+});
+```
+
+</CodeGroup>
+
+## Wallet Operations
+
+### Get Wallet Balances
+
+<CodeGroup>
+
+```tsx WalletBalance.tsx
+import { useEffect, useState } from "react";
+import { View, Text, StyleSheet } from "react-native";
+import { useWallet } from "@crossmint/client-sdk-react-native-ui";
+
+export default function WalletBalance() {
+  const { wallet } = useWallet();
+  const [balances, setBalances] = useState(null);
+
+  useEffect(() => {
+    async function fetchBalances() {
+      if (!wallet) return;
+      
+      try {
+        const balances = await wallet.balances(["usdxm"]);
+        setBalances(balances);
+      } catch (error) {
+        console.error("Error fetching balances:", error);
+      }
+    }
+    
+    fetchBalances();
+  }, [wallet]);
+
+  if (!balances) {
+    return <Text>Loading balances...</Text>;
+  }
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.label}>Wallet Address:</Text>
+      <Text>{wallet?.address}</Text>
+      
+      <Text style={styles.label}>Native Token:</Text>
+      <Text>{balances.nativeToken.amount} {balances.nativeToken.symbol}</Text>
+      
+      <Text style={styles.label}>USDXM:</Text>
+      <Text>${balances.tokens?.find(t => t.symbol === "usdxm")?.amount || "0"}</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    padding: 20,
+    gap: 10,
+  },
+  label: {
+    fontWeight: "bold",
+    marginTop: 10,
+  },
+});
+```
+
+</CodeGroup>
+
+### Send Tokens
+
+<CodeGroup>
+
+```tsx SendTokens.tsx
+import { useState } from "react";
+import { View, TextInput, Button, Text, StyleSheet, Alert } from "react-native";
+import { useWallet } from "@crossmint/client-sdk-react-native-ui";
+
+export default function SendTokens() {
+  const { wallet } = useWallet();
+  const [recipient, setRecipient] = useState("");
+  const [amount, setAmount] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [txLink, setTxLink] = useState(null);
+
+  const handleSend = async () => {
+    if (!wallet || !recipient || !amount) {
+      Alert.alert("Error", "Please fill in all fields");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const tx = await wallet.send(recipient, "usdc", amount);
+      setTxLink(tx.explorerLink);
+      Alert.alert("Success", "Transaction sent!");
+    } catch (error) {
+      Alert.alert("Error", error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <TextInput
+        style={styles.input}
+        placeholder="Recipient address"
+        value={recipient}
+        onChangeText={setRecipient}
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Amount"
+        value={amount}
+        onChangeText={setAmount}
+        keyboardType="numeric"
+      />
+      <Button
+        title={isLoading ? "Sending..." : "Send USDC"}
+        onPress={handleSend}
+        disabled={isLoading}
+      />
+      {txLink && (
+        <Text style={styles.link}>View on Explorer: {txLink}</Text>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    padding: 20,
+    gap: 10,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 5,
+    padding: 10,
+  },
+  link: {
+    color: "blue",
+    marginTop: 10,
+  },
+});
+```
+
+</CodeGroup>
+
+## Multi-Chain Support
+
+Create wallets for different chains:
+
+<CodeGroup>
+
+```tsx MultiChainWallet.tsx
+import { useState } from "react";
+import { View, Button, Text } from "react-native";
+import { useWallet } from "@crossmint/client-sdk-react-native-ui";
+
+export default function MultiChainWallet() {
+  const { wallet, getOrCreateWallet } = useWallet();
+  const [selectedChain, setSelectedChain] = useState("solana");
+
+  const switchChain = async (chain: string) => {
+    try {
+      const newWallet = await getOrCreateWallet({
+        chain,
+        signer: { type: "email" }
+      });
+      setSelectedChain(chain);
+      console.log("Switched to", chain, newWallet.address);
+    } catch (error) {
+      console.error("Error switching chain:", error);
+    }
+  };
+
+  return (
+    <View style={{ padding: 20, gap: 10 }}>
+      <Text>Current Chain: {wallet?.chain}</Text>
+      <Text>Address: {wallet?.address}</Text>
+      
+      <Button title="Solana" onPress={() => switchChain("solana")} />
+      <Button title="Ethereum" onPress={() => switchChain("ethereum")} />
+      <Button title="Polygon" onPress={() => switchChain("polygon")} />
+      <Button title="Base" onPress={() => switchChain("base")} />
+    </View>
+  );
+}
+```
+
+</CodeGroup>
+
+## Embedded Checkout
+
+Accept credit card payments for tokens and NFTs:
+
+<CodeGroup>
+
+```tsx CheckoutScreen.tsx
+import { View, StyleSheet } from "react-native";
+import {
+  CrossmintProvider,
+  CrossmintEmbeddedCheckout
+} from "@crossmint/client-sdk-react-native-ui";
+
+export default function CheckoutScreen() {
+  return (
+    <CrossmintProvider apiKey={process.env.EXPO_PUBLIC_CROSSMINT_API_KEY}>
+      <View style={styles.container}>
+        <CrossmintEmbeddedCheckout
+          recipient={{
+            walletAddress: "your_recipient_wallet_address"
+          }}
+          payment={{
+            crypto: { enabled: false },
+            fiat: { enabled: true },
+            receiptEmail: "customer@example.com"
+          }}
+          lineItems={{
+            tokenLocator: "solana:7EivYFyNfgGj8xbUymR7J4LuxUHLvi7Dgu",
+            executionParameters: {
+              mode: "exact-in",
+              amount: "1",
+              maxSlippageBps: "500"
+            }
+          }}
+        />
+      </View>
+    </CrossmintProvider>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 20,
+  },
+});
+```
+
+</CodeGroup>
+
+<Note>
+  See the [NFT Checkout Guide](/guides/nft-checkout) for more details on implementing checkout in your app.
+</Note>
+
+## Custom Storage Provider
+
+Implement custom storage for authentication tokens:
+
+<CodeGroup>
+
+```tsx CustomStorageProvider.tsx
+import { CrossmintAuthProvider, type StorageProvider } from "@crossmint/client-sdk-react-native-ui";
+
+// Implement your custom storage provider
+class CustomStorage implements StorageProvider {
+  async get(key: string): Promise<string | undefined> {
+    // Your custom storage implementation
+    // Example: return await AsyncStorage.getItem(key);
+  }
+
+  async set(key: string, value: string, expiresAt?: string): Promise<void> {
+    // Your custom storage implementation
+    // Example: await AsyncStorage.setItem(key, value);
+  }
+
+  async remove(key: string): Promise<void> {
+    // Your custom storage implementation
+    // Example: await AsyncStorage.removeItem(key);
+  }
+}
+
+// Use your custom storage provider
+export default function App() {
+  const customStorage = new CustomStorage();
+
+  return (
+    <CrossmintProvider apiKey="YOUR_API_KEY">
+      <CrossmintAuthProvider customStorageProvider={customStorage}>
+        {/* Your app content */}
+      </CrossmintAuthProvider>
+    </CrossmintProvider>
+  );
+}
+```
+
+</CodeGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="NFT Checkout" icon="credit-card" href="/guides/nft-checkout">
+    Add NFT checkout to your app
+  </Card>
+  <Card title="Custom Auth" icon="key" href="/concepts/authentication">
+    Use your own authentication
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/client-sdk/react-providers">
+    Explore the full API
+  </Card>
+  <Card title="Wallet Operations" icon="wallet" href="/examples/wallet-creation">
+    Learn wallet operations
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="SecureStore errors">
+    Make sure you've installed `expo-secure-store`:
+    ```bash
+    npm install expo-secure-store
+    ```
+  </Accordion>
+  
+  <Accordion title="Deep linking not working">
+    - Verify your `scheme` is configured in `app.json`
+    - Test deep linking with: `npx uri-scheme open your-app-scheme:// --ios`
+  </Accordion>
+  
+  <Accordion title="OAuth redirect issues">
+    Ensure your redirect URL is configured correctly in the Crossmint Console and matches your app scheme.
+  </Accordion>
+</AccordionGroup>

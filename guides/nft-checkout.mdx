@@ -1,0 +1,256 @@
+---
+title: 'NFT Checkout with Credit Card'
+description: 'Enable users to purchase NFTs using credit cards and crypto payments'
+---
+
+Crossmint provides seamless NFT checkout experiences that support both fiat (credit card) and cryptocurrency payments. This guide covers both hosted and embedded checkout implementations.
+
+## Overview
+
+Crossmint offers two checkout approaches:
+
+<CardGroup cols={2}>
+  <Card title="Hosted Checkout" icon="external-link">
+    Opens a secure Crossmint-hosted page in a new window
+  </Card>
+  <Card title="Embedded Checkout" icon="window">
+    Embeds the checkout experience directly in your app
+  </Card>
+</CardGroup>
+
+## Installation
+
+```bash
+npm install @crossmint/client-sdk-react-ui
+```
+
+## Hosted Checkout
+
+Hosted checkout opens a new window with Crossmint's payment interface. This is the quickest way to get started.
+
+<Steps>
+  <Step title="Wrap your app with CrossmintProvider">
+    ```tsx
+    import { CrossmintProvider } from "@crossmint/client-sdk-react-ui";
+
+    function App() {
+      return (
+        <CrossmintProvider apiKey="YOUR_API_KEY">
+          {/* Your app components */}
+        </CrossmintProvider>
+      );
+    }
+    ```
+  </Step>
+
+  <Step title="Add the CrossmintHostedCheckout button">
+    ```tsx
+    import { CrossmintHostedCheckout } from "@crossmint/client-sdk-react-ui";
+
+    function CheckoutButton() {
+      return (
+        <CrossmintHostedCheckout
+          lineItems={{
+            collectionLocator: "crossmint:206b3146-f526-444e-bd9d-0607d581b0e9",
+            callData: {
+              totalPrice: "0.001",
+              quantity: 1,
+            },
+          }}
+          payment={{
+            crypto: {
+              enabled: true,
+            },
+            fiat: {
+              enabled: true,
+            },
+            defaultMethod: "fiat",
+          }}
+          appearance={{
+            theme: {
+              button: "dark", // "light", "dark", or "crossmint"
+            },
+          }}
+        />
+      );
+    }
+    ```
+  </Step>
+
+  <Step title="Configure recipient (optional)">
+    Specify where the NFT should be delivered:
+
+    ```tsx
+    <CrossmintHostedCheckout
+      recipient={{
+        email: "user@example.com",
+        // or
+        walletAddress: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+      }}
+      // ... other props
+    />
+    ```
+  </Step>
+</Steps>
+
+<Tip>
+  The hosted checkout button automatically styles itself based on the `theme.button` property. Available themes: `light`, `dark`, and `crossmint`.
+</Tip>
+
+## Embedded Checkout
+
+Embedded checkout provides a seamless in-app experience with full control over the UI.
+
+<Steps>
+  <Step title="Set up the providers">
+    ```tsx
+    import { 
+      CrossmintProvider,
+      CrossmintCheckoutProvider 
+    } from "@crossmint/client-sdk-react-ui";
+
+    function App() {
+      return (
+        <CrossmintProvider apiKey="YOUR_API_KEY">
+          <CrossmintCheckoutProvider>
+            <CheckoutPage />
+          </CrossmintCheckoutProvider>
+        </CrossmintProvider>
+      );
+    }
+    ```
+  </Step>
+
+  <Step title="Add the embedded checkout component">
+    ```tsx
+    import { CrossmintEmbeddedCheckout } from "@crossmint/client-sdk-react-ui";
+
+    function CheckoutPage() {
+      return (
+        <div style={{ maxWidth: "500px", margin: "0 auto" }}>
+          <CrossmintEmbeddedCheckout
+            recipient={{
+              walletAddress: "maxfQWBno84Zfu4sXgmjYvsvLn4LzGFSgSkFMFuzved",
+            }}
+            lineItems={{
+              tokenLocator: "solana:7EivYFyNfgGj8xbUymR7J4LuxUHLKRzpLaERHLvi7Dgu",
+              executionParameters: {
+                mode: "exact-in",
+                amount: "1",
+                maxSlippageBps: "500",
+              },
+            }}
+            payment={{
+              receiptEmail: "customer@example.com",
+              crypto: {
+                enabled: false,
+              },
+              fiat: {
+                enabled: true,
+              },
+              defaultMethod: "fiat",
+            }}
+          />
+        </div>
+      );
+    }
+    ```
+  </Step>
+
+  <Step title="Listen to checkout events (optional)">
+    Track the order status and customize the experience:
+
+    ```tsx
+    import { useCrossmintCheckout } from "@crossmint/client-sdk-react-ui";
+
+    function CheckoutWithCustomHandling() {
+      const { order } = useCrossmintCheckout();
+
+      useEffect(() => {
+        console.log("Order status:", order?.phase);
+      }, [order]);
+
+      switch (order?.phase) {
+        case "completed":
+          return <div>Thank you for your purchase!</div>;
+        case "delivery":
+          return <div>Processing your NFT...</div>;
+        default:
+          return <CrossmintEmbeddedCheckout {...props} />;
+      }
+    }
+    ```
+  </Step>
+</Steps>
+
+## Payment Configuration
+
+Control which payment methods are available:
+
+```tsx
+payment={{
+  // Enable/disable crypto payments
+  crypto: {
+    enabled: true,
+  },
+  // Enable/disable credit card payments
+  fiat: {
+    enabled: true,
+  },
+  // Set the default payment method
+  defaultMethod: "fiat", // "fiat" or "crypto"
+  // Optional: capture customer email for receipt
+  receiptEmail: "customer@example.com",
+}}
+```
+
+## Customizing Appearance
+
+For embedded checkout, customize colors and styling:
+
+```tsx
+appearance={{
+  variables: {
+    colors: {
+      backgroundPrimary: "#000000",
+      textPrimary: "#FFFFFF",
+      accent: "#00D9FF",
+    },
+  },
+}}
+```
+
+## Multi-Chain Support
+
+Crossmint supports NFT purchases across multiple chains:
+
+- **Ethereum** (ERC-721, ERC-1155)
+- **Solana** (SPL tokens)
+- **Polygon**
+- **Base**
+- **And more...**
+
+Specify the chain in your `collectionLocator` or `tokenLocator`:
+
+```tsx
+// Ethereum
+lineItems={{ collectionLocator: "crossmint:collection-id" }}
+
+// Solana
+lineItems={{ tokenLocator: "solana:token-address" }}
+```
+
+<Warning>
+  Make sure your API key has the correct permissions for the chains you want to support. Configure this in your Crossmint Console.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Embedded Wallets" icon="wallet" href="/guides/embedded-wallets">
+    Create wallets for users automatically
+  </Card>
+  <Card title="Multi-Chain Support" icon="link" href="/guides/multi-chain-support">
+    Learn about cross-chain capabilities
+  </Card>
+</CardGroup>

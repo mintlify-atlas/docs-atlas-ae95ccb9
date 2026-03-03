@@ -1,0 +1,562 @@
+---
+title: 'Custom Transactions'
+description: 'Build and execute custom blockchain transactions across EVM and Solana'
+---
+
+Go beyond simple transfers and build custom transactions for smart contracts, DeFi protocols, and complex blockchain interactions.
+
+## Overview
+
+Crossmint's Wallets SDK supports:
+
+- **Smart contract interactions** - Call any contract method
+- **Token transfers** - ERC-20, ERC-721, ERC-1155, SPL tokens
+- **Message signing** - For authentication and verification
+- **Typed data signing** - EIP-712 support
+- **Raw transactions** - Full control over transaction parameters
+
+## Prerequisites
+
+```bash
+npm install @crossmint/wallets-sdk @crossmint/common-sdk-base
+```
+
+For Solana transactions:
+```bash
+npm install @solana/web3.js
+```
+
+## EVM Smart Contract Interactions
+
+### Calling Contract Methods
+
+Interact with smart contracts using the ABI:
+
+<Steps>
+  <Step title="Get an EVM wallet">
+    ```typescript
+    import { createCrossmint } from "@crossmint/common-sdk-base";
+    import { CrossmintWallets, EVMWallet } from "@crossmint/wallets-sdk";
+
+    const crossmint = createCrossmint({ apiKey: "YOUR_API_KEY" });
+    const wallets = CrossmintWallets.from(crossmint);
+
+    const wallet = await wallets.getOrCreateWallet({
+      chain: "ethereum-sepolia",
+      signer: { type: "api-key", locator: "user-123" },
+    });
+
+    const evmWallet = EVMWallet.from(wallet);
+    ```
+  </Step>
+
+  <Step title="Define the contract ABI">
+    ```typescript
+    const nftAbi = [
+      {
+        inputs: [
+          { name: "to", type: "address" },
+          { name: "tokenId", type: "uint256" },
+        ],
+        name: "mint",
+        outputs: [],
+        stateMutability: "nonpayable",
+        type: "function",
+      },
+    ] as const;
+    ```
+  </Step>
+
+  <Step title="Execute the transaction">
+    ```typescript
+    const result = await evmWallet.sendTransaction({
+      to: "0xContractAddress123456789",
+      abi: nftAbi,
+      functionName: "mint",
+      args: ["0xRecipientAddress", 1],
+    });
+
+    console.log("Transaction hash:", result.hash);
+    console.log("Explorer link:", result.explorerLink);
+    console.log("Transaction ID:", result.transactionId);
+    ```
+  </Step>
+</Steps>
+
+### ERC-20 Token Transfer
+
+Transfer ERC-20 tokens:
+
+```typescript
+const erc20Abi = [
+  {
+    inputs: [
+      { name: "to", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    name: "transfer",
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+] as const;
+
+const result = await evmWallet.sendTransaction({
+  to: "0xTokenContractAddress",
+  abi: erc20Abi,
+  functionName: "transfer",
+  args: [
+    "0xRecipient",
+    "1000000000000000000", // 1 token with 18 decimals
+  ],
+});
+```
+
+### ERC-721 NFT Transfer
+
+```typescript
+const erc721Abi = [
+  {
+    inputs: [
+      { name: "from", type: "address" },
+      { name: "to", type: "address" },
+      { name: "tokenId", type: "uint256" },
+    ],
+    name: "transferFrom",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+] as const;
+
+const result = await evmWallet.sendTransaction({
+  to: "0xNFTContractAddress",
+  abi: erc721Abi,
+  functionName: "transferFrom",
+  args: [
+    evmWallet.address,
+    "0xRecipient",
+    42, // Token ID
+  ],
+});
+```
+
+## Sending Native Currency
+
+Send ETH, MATIC, or other native tokens:
+
+```typescript
+const result = await evmWallet.sendTransaction({
+  to: "0xRecipientAddress",
+  value: "0.1", // Amount in ETH/MATIC/etc.
+});
+
+console.log("Sent 0.1 ETH to", "0xRecipientAddress");
+console.log("Transaction:", result.explorerLink);
+```
+
+## Message Signing
+
+### Sign a Message
+
+Sign arbitrary messages for authentication:
+
+```typescript
+const signature = await evmWallet.signMessage({
+  message: "Sign this message to authenticate",
+});
+
+console.log("Signature:", signature.signature);
+console.log("Signature ID:", signature.signatureId);
+```
+
+### Verify Message Signature
+
+```typescript
+import { verifyMessage } from "viem";
+
+const isValid = await verifyMessage({
+  address: evmWallet.address,
+  message: "Sign this message to authenticate",
+  signature: signature.signature,
+});
+
+console.log("Signature valid:", isValid);
+```
+
+## EIP-712 Typed Data Signing
+
+Sign structured data following EIP-712:
+
+```typescript
+const domain = {
+  name: "MyDApp",
+  version: "1",
+  chainId: 11155111, // Sepolia
+  verifyingContract: "0xContractAddress",
+};
+
+const types = {
+  Person: [
+    { name: "name", type: "string" },
+    { name: "wallet", type: "address" },
+  ],
+};
+
+const message = {
+  name: "Alice",
+  wallet: "0xAliceAddress",
+};
+
+const signature = await evmWallet.signTypedData({
+  domain,
+  types,
+  primaryType: "Person",
+  message,
+  chain: "ethereum-sepolia",
+});
+
+console.log("Typed data signature:", signature.signature);
+```
+
+<Tip>
+  EIP-712 signatures are commonly used by DeFi protocols for gasless approvals and permit functions.
+</Tip>
+
+## Solana Transactions
+
+### Basic SOL Transfer
+
+```typescript
+import { SolanaWallet } from "@crossmint/wallets-sdk";
+import { Transaction, SystemProgram, PublicKey } from "@solana/web3.js";
+
+const wallet = await wallets.getOrCreateWallet({
+  chain: "solana-devnet",
+  signer: { type: "api-key", locator: "user-123" },
+});
+
+const solanaWallet = SolanaWallet.from(wallet);
+
+// Create transfer transaction
+const transaction = new Transaction().add(
+  SystemProgram.transfer({
+    fromPubkey: new PublicKey(solanaWallet.address),
+    toPubkey: new PublicKey("recipient-address"),
+    lamports: 1000000, // 0.001 SOL
+  })
+);
+
+// Serialize and send
+const serialized = transaction.serialize().toString("base64");
+const result = await solanaWallet.sendTransaction({
+  serializedTransaction: serialized,
+});
+
+console.log("Transaction hash:", result.hash);
+```
+
+### SPL Token Transfer
+
+```typescript
+import {
+  createTransferInstruction,
+  getAssociatedTokenAddress,
+} from "@solana/spl-token";
+
+const tokenMint = new PublicKey("TokenMintAddress");
+const recipientAddress = new PublicKey("RecipientAddress");
+
+// Get token accounts
+const sourceAccount = await getAssociatedTokenAddress(
+  tokenMint,
+  new PublicKey(solanaWallet.address)
+);
+
+const destinationAccount = await getAssociatedTokenAddress(
+  tokenMint,
+  recipientAddress
+);
+
+// Create transfer instruction
+const transaction = new Transaction().add(
+  createTransferInstruction(
+    sourceAccount,
+    destinationAccount,
+    new PublicKey(solanaWallet.address),
+    1000000, // Amount with token decimals
+  )
+);
+
+const serialized = transaction.serialize().toString("base64");
+const result = await solanaWallet.sendTransaction({
+  serializedTransaction: serialized,
+});
+```
+
+### Solana Program Interaction
+
+Interact with Solana programs (smart contracts):
+
+```typescript
+import { TransactionInstruction } from "@solana/web3.js";
+
+const programId = new PublicKey("ProgramAddress");
+
+const instruction = new TransactionInstruction({
+  keys: [
+    { pubkey: new PublicKey(solanaWallet.address), isSigner: true, isWritable: true },
+    { pubkey: new PublicKey("AccountAddress"), isSigner: false, isWritable: true },
+  ],
+  programId,
+  data: Buffer.from([/* instruction data */]),
+});
+
+const transaction = new Transaction().add(instruction);
+const serialized = transaction.serialize().toString("base64");
+
+const result = await solanaWallet.sendTransaction({
+  serializedTransaction: serialized,
+});
+```
+
+## Advanced Transaction Options
+
+### Prepare-Only Mode
+
+Create transactions without executing them:
+
+```typescript
+const prepared = await evmWallet.sendTransaction({
+  to: "0xRecipient",
+  value: "0.1",
+  options: {
+    experimental_prepareOnly: true,
+  },
+});
+
+console.log("Transaction ID:", prepared.transactionId);
+console.log("Hash:", prepared.hash); // undefined - not executed yet
+
+// Execute later
+const result = await evmWallet.approveTransactionAndWait(prepared.transactionId);
+console.log("Executed hash:", result.hash);
+```
+
+<Warning>
+  Prepare-only mode is experimental and may change in future versions.
+</Warning>
+
+### Custom Gas Settings
+
+Control gas prices for EVM transactions:
+
+```typescript
+const result = await evmWallet.sendTransaction({
+  to: "0xRecipient",
+  value: "0.1",
+  gasLimit: "21000",
+  maxFeePerGas: "50000000000", // 50 gwei
+  maxPriorityFeePerGas: "2000000000", // 2 gwei
+});
+```
+
+## Transaction Status Tracking
+
+Monitor transaction status:
+
+```typescript
+// Send transaction
+const result = await evmWallet.sendTransaction({
+  to: "0xRecipient",
+  value: "0.1",
+});
+
+// Check status later
+const transaction = await wallet.getTransaction(result.transactionId);
+
+console.log("Status:", transaction.status);
+console.log("Hash:", transaction.onChain?.txId);
+console.log("Explorer:", transaction.onChain?.explorerLink);
+```
+
+Possible status values:
+- `pending` - Transaction created but not submitted
+- `submitted` - Transaction sent to blockchain
+- `success` - Transaction confirmed
+- `failed` - Transaction failed
+
+## Transaction History
+
+Retrieve past transactions:
+
+```typescript
+const transactions = await wallet.getTransactions();
+
+for (const tx of transactions) {
+  console.log("ID:", tx.id);
+  console.log("Status:", tx.status);
+  console.log("Hash:", tx.onChain?.txId);
+  console.log("Created:", new Date(tx.createdAt));
+  console.log("---");
+}
+```
+
+## Batch Transactions
+
+Execute multiple transactions efficiently:
+
+```typescript
+async function batchMint(recipients: string[]) {
+  const promises = recipients.map((recipient) =>
+    evmWallet.sendTransaction({
+      to: "0xNFTContract",
+      abi: nftAbi,
+      functionName: "mint",
+      args: [recipient, 1],
+    })
+  );
+
+  const results = await Promise.all(promises);
+  return results.map((r) => r.hash);
+}
+
+const txHashes = await batchMint([
+  "0xRecipient1",
+  "0xRecipient2",
+  "0xRecipient3",
+]);
+
+console.log("Minted to", txHashes.length, "recipients");
+```
+
+## Error Handling
+
+Handle transaction errors gracefully:
+
+```typescript
+import { 
+  TransactionNotCreatedError,
+  TransactionFailedError,
+  InsufficientFundsError 
+} from "@crossmint/wallets-sdk";
+
+try {
+  const result = await evmWallet.sendTransaction({
+    to: "0xRecipient",
+    value: "100", // Too much!
+  });
+} catch (error) {
+  if (error instanceof InsufficientFundsError) {
+    console.error("Not enough funds");
+    // Prompt user to add funds
+  } else if (error instanceof TransactionFailedError) {
+    console.error("Transaction failed on-chain");
+    // Show error to user
+  } else if (error instanceof TransactionNotCreatedError) {
+    console.error("Failed to create transaction");
+    // Retry or show error
+  } else {
+    console.error("Unknown error:", error);
+  }
+}
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Validate inputs before sending">
+    ```typescript
+    import { isValidEvmAddress } from "@crossmint/common-sdk-base";
+
+    function validateRecipient(address: string) {
+      if (!isValidEvmAddress(address)) {
+        throw new Error("Invalid recipient address");
+      }
+    }
+
+    validateRecipient(recipientAddress);
+    await evmWallet.sendTransaction({ to: recipientAddress, value: "0.1" });
+    ```
+  </Step>
+
+  <Step title="Check balances before transactions">
+    ```typescript
+    const balance = await wallet.getBalance();
+    const requiredAmount = parseFloat("0.1");
+
+    if (parseFloat(balance.native.raw) < requiredAmount) {
+      throw new Error("Insufficient balance");
+    }
+
+    await evmWallet.sendTransaction({
+      to: "0xRecipient",
+      value: requiredAmount.toString(),
+    });
+    ```
+  </Step>
+
+  <Step title="Use explorer links for transparency">
+    ```typescript
+    const result = await evmWallet.sendTransaction({...});
+
+    console.log("View transaction:", result.explorerLink);
+    // Show link to user so they can track progress
+    ```
+  </Step>
+
+  <Step title="Implement retry logic">
+    ```typescript
+    async function sendWithRetry(tx: any, maxRetries = 3) {
+      for (let i = 0; i < maxRetries; i++) {
+        try {
+          return await evmWallet.sendTransaction(tx);
+        } catch (error) {
+          if (i === maxRetries - 1) throw error;
+          await new Promise((resolve) => setTimeout(resolve, 1000 * (i + 1)));
+        }
+      }
+    }
+    ```
+  </Step>
+</Steps>
+
+## Testing Transactions
+
+Always test on testnets first:
+
+```typescript
+// Use testnet chains
+const testWallet = await wallets.getOrCreateWallet({
+  chain: "ethereum-sepolia", // Testnet
+  signer: { type: "api-key", locator: "test-user" },
+});
+
+const testEvmWallet = EVMWallet.from(testWallet);
+
+// Test your transaction
+const result = await testEvmWallet.sendTransaction({
+  to: "0xTestRecipient",
+  value: "0.001",
+});
+
+console.log("Test transaction:", result.explorerLink);
+```
+
+<Tip>
+  Get free testnet tokens from faucets:
+  - Ethereum Sepolia: https://sepoliafaucet.com
+  - Polygon Amoy: https://faucet.polygon.technology
+  - Solana Devnet: Use `solana airdrop` CLI command
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Multi-Chain Support" icon="link" href="/guides/multi-chain-support">
+    Execute transactions across multiple chains
+  </Card>
+  <Card title="Embedded Wallets" icon="wallet" href="/guides/embedded-wallets">
+    Manage wallets for your users
+  </Card>
+</CardGroup>

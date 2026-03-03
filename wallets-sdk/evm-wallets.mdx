@@ -1,0 +1,435 @@
+---
+title: "EVM Wallets"
+description: "Work with EVM chains including Ethereum, Polygon, Base, and more"
+---
+
+## Overview
+
+The `EVMWallet` class extends the base `Wallet` with EVM-specific functionality including:
+- Custom transaction execution
+- Message signing
+- EIP-712 typed data signing
+- Smart contract interactions
+- Viem integration
+
+## Create an EVM Wallet Instance
+
+Cast a base `Wallet` to `EVMWallet` for EVM-specific operations:
+
+```typescript
+import { EVMWallet } from "@crossmint/wallets-sdk";
+
+// Assuming you have a wallet instance
+const evmWallet = EVMWallet.from(wallet);
+```
+
+<Note>
+The `EVMWallet.from()` method will throw an error if the wallet is not on an EVM chain.
+</Note>
+
+## Send Custom Transactions
+
+Execute custom transactions on EVM chains.
+
+### Method Signature
+
+```typescript
+evmWallet.sendTransaction(params: EVMTransactionInput): Promise<Transaction>
+```
+
+### Send Raw Transaction
+
+Send a serialized transaction:
+
+```typescript
+const tx = await evmWallet.sendTransaction({
+    transaction: "0x...", // Serialized transaction hex
+});
+
+console.log(tx.hash);
+console.log(tx.explorerLink);
+```
+
+### Send with Call Data
+
+Send a transaction with explicit call data:
+
+```typescript
+const tx = await evmWallet.sendTransaction({
+    to: "0xContractAddress...",
+    value: 0n, // Value in wei (bigint)
+    data: "0x...", // Encoded function call
+});
+```
+
+### Send with ABI
+
+Use contract ABI for type-safe contract interactions:
+
+```typescript
+const ERC20_ABI = [
+    {
+        name: "transfer",
+        type: "function",
+        inputs: [
+            { name: "to", type: "address" },
+            { name: "amount", type: "uint256" },
+        ],
+        outputs: [{ name: "", type: "bool" }],
+        stateMutability: "nonpayable",
+    },
+];
+
+const tx = await evmWallet.sendTransaction({
+    to: "0xTokenContractAddress...",
+    abi: ERC20_ABI,
+    functionName: "transfer",
+    args: ["0xRecipient...", 1000000n], // 1 USDC (6 decimals)
+    value: 0n,
+});
+```
+
+### Prepare-Only Mode
+
+Create a transaction without executing:
+
+```typescript
+const preparedTx = await evmWallet.sendTransaction({
+    to: "0xContractAddress...",
+    data: "0x...",
+    options: {
+        experimental_prepareOnly: true,
+    },
+});
+
+console.log(preparedTx.transactionId);
+
+// Approve later
+const completedTx = await wallet.approve({
+    transactionId: preparedTx.transactionId,
+});
+```
+
+### With Custom Signer
+
+```typescript
+const tx = await evmWallet.sendTransaction({
+    to: "0xContractAddress...",
+    data: "0x...",
+    options: {
+        experimental_signer: "external-wallet:0x...",
+    },
+});
+```
+
+### Parameters
+
+<ParamField path="to" type="string" required>
+  Recipient address (contract or EOA)
+</ParamField>
+
+<ParamField path="value" type="bigint">
+  Value to send in wei (default: 0n)
+</ParamField>
+
+<ParamField path="data" type="0x${string}">
+  Encoded transaction data
+</ParamField>
+
+<ParamField path="abi" type="Abi">
+  Contract ABI for encoding function calls
+</ParamField>
+
+<ParamField path="functionName" type="string">
+  Function name to call (requires abi)
+</ParamField>
+
+<ParamField path="args" type="unknown[]">
+  Function arguments (requires abi and functionName)
+</ParamField>
+
+<ParamField path="transaction" type="string">
+  Serialized transaction (alternative to above fields)
+</ParamField>
+
+<ParamField path="options" type="TransactionInputOptions">
+  <Expandable title="properties">
+    <ParamField path="experimental_prepareOnly" type="boolean">
+      Create without executing
+    </ParamField>
+    <ParamField path="experimental_signer" type="string">
+      Custom signer locator
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Sign Messages
+
+Sign arbitrary messages with the wallet's private key.
+
+### Method Signature
+
+```typescript
+evmWallet.signMessage(params: SignMessageInput): Promise<Signature>
+```
+
+### Basic Usage
+
+```typescript
+const signResult = await evmWallet.signMessage({
+    message: "Hello, blockchain!",
+});
+
+console.log(signResult.signature);   // "0x..."
+console.log(signResult.signatureId); // Signature ID for tracking
+```
+
+### Prepare-Only Mode
+
+```typescript
+const preparedSig = await evmWallet.signMessage({
+    message: "Hello, blockchain!",
+    options: {
+        experimental_prepareOnly: true,
+    },
+});
+
+console.log(preparedSig.signatureId);
+
+// Approve later
+const completedSig = await wallet.approve({
+    signatureId: preparedSig.signatureId,
+});
+
+console.log(completedSig.signature);
+```
+
+## Sign Typed Data (EIP-712)
+
+Sign structured data following the EIP-712 standard.
+
+### Method Signature
+
+```typescript
+evmWallet.signTypedData(params: SignTypedDataInput): Promise<Signature>
+```
+
+### Usage
+
+```typescript
+const signResult = await evmWallet.signTypedData({
+    domain: {
+        name: "My DApp",
+        version: "1",
+        chainId: 137n, // Polygon
+        verifyingContract: "0xContractAddress...",
+    },
+    types: {
+        Person: [
+            { name: "name", type: "string" },
+            { name: "wallet", type: "address" },
+        ],
+        Mail: [
+            { name: "from", type: "Person" },
+            { name: "to", type: "Person" },
+            { name: "contents", type: "string" },
+        ],
+    },
+    primaryType: "Mail",
+    message: {
+        from: {
+            name: "Alice",
+            wallet: "0xAlice...",
+        },
+        to: {
+            name: "Bob",
+            wallet: "0xBob...",
+        },
+        contents: "Hello, Bob!",
+    },
+    chain: "polygon",
+});
+
+console.log(signResult.signature);
+```
+
+### Permit Example
+
+Sign an ERC20 permit for gasless approvals:
+
+```typescript
+const permitSignature = await evmWallet.signTypedData({
+    domain: {
+        name: "USD Coin",
+        version: "2",
+        chainId: 137n,
+        verifyingContract: "0xUSDCContractAddress...",
+    },
+    types: {
+        Permit: [
+            { name: "owner", type: "address" },
+            { name: "spender", type: "address" },
+            { name: "value", type: "uint256" },
+            { name: "nonce", type: "uint256" },
+            { name: "deadline", type: "uint256" },
+        ],
+    },
+    primaryType: "Permit",
+    message: {
+        owner: wallet.address,
+        spender: "0xSpenderAddress...",
+        value: 1000000n,
+        nonce: 0n,
+        deadline: BigInt(Math.floor(Date.now() / 1000) + 3600),
+    },
+    chain: "polygon",
+});
+```
+
+### Parameters
+
+<ParamField path="domain" type="TypedDataDomain" required>
+  EIP-712 domain information
+  
+  <Expandable title="properties">
+    <ParamField path="name" type="string" required>
+      Domain name
+    </ParamField>
+    <ParamField path="version" type="string" required>
+      Domain version
+    </ParamField>
+    <ParamField path="chainId" type="bigint" required>
+      Chain ID
+    </ParamField>
+    <ParamField path="verifyingContract" type="string" required>
+      Contract address
+    </ParamField>
+    <ParamField path="salt" type="string">
+      Optional salt
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="types" type="Record<string, Array<{name: string, type: string}>>" required>
+  Type definitions for the structured data
+</ParamField>
+
+<ParamField path="primaryType" type="string" required>
+  The primary type being signed
+</ParamField>
+
+<ParamField path="message" type="Record<string, any>" required>
+  The data to sign
+</ParamField>
+
+<ParamField path="chain" type="EVMChain" required>
+  The EVM chain (e.g., "polygon", "ethereum")
+</ParamField>
+
+<ParamField path="options" type="SignatureInputOptions">
+  <Expandable title="properties">
+    <ParamField path="experimental_prepareOnly" type="boolean">
+      Create signature without executing
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Viem Integration
+
+Get a Viem public client for advanced blockchain interactions.
+
+### Method Signature
+
+```typescript
+evmWallet.getViemClient(params?: { transport?: HttpTransport }): PublicClient
+```
+
+### Usage
+
+```typescript
+import { http } from "viem";
+
+// Get client with default transport
+const viemClient = evmWallet.getViemClient();
+
+// Or provide custom transport
+const customClient = evmWallet.getViemClient({
+    transport: http("https://polygon-rpc.com"),
+});
+
+// Use Viem client for read operations
+const blockNumber = await viemClient.getBlockNumber();
+const balance = await viemClient.getBalance({ address: wallet.address });
+```
+
+## Complete Example: NFT Minting
+
+Here's a full example of minting an NFT using the EVM wallet:
+
+```typescript
+import { CrossmintWallets, createCrossmint, EVMWallet } from "@crossmint/wallets-sdk";
+
+// Initialize
+const crossmint = createCrossmint({ apiKey: "..." });
+const crossmintWallets = CrossmintWallets.from(crossmint);
+
+// Get wallet
+const wallet = await crossmintWallets.getOrCreateWallet({
+    chain: "polygon",
+    signer: { type: "email", email: "user@example.com", onAuthRequired: async (...) => {...} },
+});
+
+// Cast to EVM wallet
+const evmWallet = EVMWallet.from(wallet);
+
+// Mint NFT
+const NFT_CONTRACT_ABI = [
+    {
+        name: "mint",
+        type: "function",
+        inputs: [{ name: "to", type: "address" }],
+        outputs: [],
+        stateMutability: "payable",
+    },
+];
+
+const mintTx = await evmWallet.sendTransaction({
+    to: "0xNFTContractAddress...",
+    abi: NFT_CONTRACT_ABI,
+    functionName: "mint",
+    args: [wallet.address],
+    value: 0n, // Mint price in wei
+});
+
+console.log(`NFT minted! Transaction: ${mintTx.explorerLink}`);
+```
+
+## Supported EVM Chains
+
+The SDK supports all major EVM chains including:
+
+- Ethereum (mainnet, sepolia)
+- Polygon (mainnet, amoy)
+- Base (mainnet, sepolia)
+- Arbitrum (mainnet, sepolia)
+- Optimism (mainnet, sepolia)
+- Avalanche (mainnet, fuji)
+- BNB Chain
+- And many more...
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Wallet Operations" icon="list-check" href="/wallets-sdk/wallet-operations">
+    Learn about common wallet operations
+  </Card>
+  <Card title="Delegated Signers" icon="users" href="/wallets-sdk/delegated-signers">
+    Add multiple signers to a wallet
+  </Card>
+  <Card title="Solana Wallets" icon="circle" href="/wallets-sdk/solana-wallets">
+    Learn about Solana-specific operations
+  </Card>
+  <Card title="Stellar Wallets" icon="star" href="/wallets-sdk/stellar-wallets">
+    Learn about Stellar-specific operations
+  </Card>
+</CardGroup>

@@ -1,0 +1,373 @@
+---
+title: 'Credit Card Payments'
+description: 'Accept credit card payments for NFTs and blockchain transactions'
+---
+
+Crossmint enables users to purchase NFTs and interact with blockchain applications using credit cards, removing the need for cryptocurrency.
+
+## Overview
+
+Credit card (fiat) payments through Crossmint provide:
+
+- **No crypto required** - Users pay with traditional payment methods
+- **Instant conversion** - Fiat is automatically converted to crypto
+- **Multiple currencies** - Support for USD, EUR, and more
+- **Secure processing** - PCI-compliant payment handling
+
+## Payment Flow
+
+Here's how credit card payments work:
+
+<Steps>
+  <Step title="User initiates purchase">
+    User clicks checkout and selects credit card payment
+  </Step>
+  <Step title="Payment collection">
+    Crossmint securely collects payment information
+  </Step>
+  <Step title="Automatic conversion">
+    Fiat currency is converted to the required cryptocurrency
+  </Step>
+  <Step title="Transaction execution">
+    The blockchain transaction is executed automatically
+  </Step>
+  <Step title="NFT delivery">
+    The NFT is delivered to the user's wallet
+  </Step>
+</Steps>
+
+## Enable Credit Card Payments
+
+### Hosted Checkout
+
+The simplest way to accept credit card payments:
+
+```tsx
+import { CrossmintHostedCheckout } from "@crossmint/client-sdk-react-ui";
+
+function PurchaseButton() {
+  return (
+    <CrossmintHostedCheckout
+      lineItems={{
+        collectionLocator: "crossmint:your-collection-id",
+        callData: {
+          totalPrice: "0.001",
+          quantity: 1,
+        },
+      }}
+      payment={{
+        fiat: {
+          enabled: true, // Enable credit card payments
+        },
+        crypto: {
+          enabled: true, // Also allow crypto payments
+        },
+        defaultMethod: "fiat", // Default to credit card
+      }}
+    />
+  );
+}
+```
+
+### Embedded Checkout
+
+For a fully embedded experience:
+
+```tsx
+import { CrossmintEmbeddedCheckout } from "@crossmint/client-sdk-react-ui";
+
+function CheckoutPage() {
+  return (
+    <CrossmintEmbeddedCheckout
+      recipient={{
+        email: "customer@example.com",
+      }}
+      lineItems={{
+        tokenLocator: "ethereum:0x1234...",
+        executionParameters: {
+          mode: "exact-in",
+          amount: "1",
+        },
+      }}
+      payment={{
+        fiat: {
+          enabled: true,
+        },
+        receiptEmail: "customer@example.com",
+        defaultMethod: "fiat",
+      }}
+    />
+  );
+}
+```
+
+## Payment Configuration
+
+### Fiat-Only Checkout
+
+Require credit card payments only:
+
+```tsx
+payment={{
+  fiat: {
+    enabled: true,
+  },
+  crypto: {
+    enabled: false, // Disable crypto payments
+  },
+  defaultMethod: "fiat",
+}}
+```
+
+### Email Receipt
+
+Send payment receipts to customers:
+
+```tsx
+payment={{
+  fiat: {
+    enabled: true,
+  },
+  receiptEmail: "customer@example.com",
+}}
+```
+
+<Tip>
+  When using embedded checkout, always provide a `receiptEmail` for better customer experience and record-keeping.
+</Tip>
+
+## Pricing Configuration
+
+### Fixed Price
+
+Set a fixed price in the blockchain's native currency:
+
+```tsx
+lineItems={{
+  collectionLocator: "crossmint:collection-id",
+  callData: {
+    totalPrice: "0.001", // Price in ETH/SOL/etc.
+    quantity: 1,
+  },
+}}
+```
+
+### Dynamic Pricing
+
+For dynamic pricing based on market rates, use execution parameters:
+
+```tsx
+lineItems={{
+  tokenLocator: "ethereum:0x1234...",
+  executionParameters: {
+    mode: "exact-in",
+    amount: "1",
+    maxSlippageBps: "500", // 5% max slippage
+  },
+}}
+```
+
+## Handling Payment Events
+
+Track payment status in real-time:
+
+```tsx
+import { useCrossmintCheckout } from "@crossmint/client-sdk-react-ui";
+
+function CheckoutStatus() {
+  const { order } = useCrossmintCheckout();
+
+  useEffect(() => {
+    if (order) {
+      console.log("Order phase:", order.phase);
+      console.log("Order ID:", order.id);
+    }
+  }, [order]);
+
+  switch (order?.phase) {
+    case "payment":
+      return <div>Processing payment...</div>;
+    case "delivery":
+      return <div>Payment successful! Delivering NFT...</div>;
+    case "completed":
+      return <div>Purchase complete!</div>;
+    default:
+      return <CrossmintEmbeddedCheckout {...props} />;
+  }
+}
+```
+
+## Payment States
+
+Understand the different payment phases:
+
+| Phase | Description |
+|-------|-------------|
+| `payment` | User is entering payment information |
+| `delivery` | Payment successful, delivering NFT |
+| `completed` | Transaction complete, NFT delivered |
+| `failed` | Payment or delivery failed |
+
+## Payment Method Management
+
+Allow users to save and manage payment methods:
+
+```tsx
+import { CrossmintPaymentMethodManagement } from "@crossmint/client-sdk-react-ui";
+
+function PaymentSettings() {
+  return (
+    <div>
+      <h2>Saved Payment Methods</h2>
+      <CrossmintPaymentMethodManagement />
+    </div>
+  );
+}
+```
+
+<Warning>
+  Payment method management requires user authentication. Ensure users are logged in before showing this component.
+</Warning>
+
+## Supported Payment Methods
+
+Crossmint supports various payment methods:
+
+- **Credit Cards** - Visa, Mastercard, American Express
+- **Debit Cards** - Most major debit cards
+- **Apple Pay** - Available on supported devices
+- **Google Pay** - Available on supported devices
+
+## Currency Support
+
+Supported fiat currencies:
+
+- USD (US Dollar)
+- EUR (Euro)
+- GBP (British Pound)
+- CAD (Canadian Dollar)
+- AUD (Australian Dollar)
+- And more...
+
+<Tip>
+  Currency is automatically detected based on the user's location and card. No additional configuration needed.
+</Tip>
+
+## Testing Credit Card Payments
+
+Use test cards in development:
+
+### Successful Payment
+```
+Card Number: 4242 4242 4242 4242
+Expiry: Any future date
+CVV: Any 3 digits
+```
+
+### Declined Payment
+```
+Card Number: 4000 0000 0000 0002
+Expiry: Any future date
+CVV: Any 3 digits
+```
+
+<Warning>
+  Never use real credit card information in development or staging environments.
+</Warning>
+
+## Custom Styling
+
+Customize the payment UI for embedded checkout:
+
+```tsx
+appearance={{
+  variables: {
+    colors: {
+      backgroundPrimary: "#FFFFFF",
+      textPrimary: "#000000",
+      accent: "#00D9FF",
+      border: "#E5E5E5",
+    },
+    borderRadius: {
+      small: "4px",
+      medium: "8px",
+      large: "12px",
+    },
+  },
+}}
+```
+
+## Security Best Practices
+
+<Steps>
+  <Step title="Use HTTPS">
+    Always serve your application over HTTPS in production.
+  </Step>
+
+  <Step title="Validate on backend">
+    Never trust client-side payment data. Validate all transactions on your backend.
+  </Step>
+
+  <Step title="Monitor transactions">
+    Set up webhooks to receive real-time transaction updates:
+    ```typescript
+    // Backend webhook endpoint
+    app.post("/webhook/crossmint", async (req, res) => {
+      const event = req.body;
+      
+      if (event.type === "transaction.completed") {
+        // Update your database
+        await db.orders.update(event.orderId, {
+          status: "completed",
+          txHash: event.txHash,
+        });
+      }
+      
+      res.json({ received: true });
+    });
+    ```
+  </Step>
+
+  <Step title="Handle errors gracefully">
+    ```tsx
+    function CheckoutWithErrorHandling() {
+      const { order, error } = useCrossmintCheckout();
+
+      if (error) {
+        return (
+          <div className="error">
+            <p>Payment failed: {error.message}</p>
+            <button onClick={() => window.location.reload()}>
+              Try Again
+            </button>
+          </div>
+        );
+      }
+
+      return <CrossmintEmbeddedCheckout {...props} />;
+    }
+    ```
+  </Step>
+</Steps>
+
+## Localization
+
+Support multiple languages:
+
+```tsx
+<CrossmintHostedCheckout
+  locale="en-US" // "en-US", "es-ES", "fr-FR", etc.
+  // ... other props
+/>
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="NFT Checkout" icon="shopping-cart" href="/guides/nft-checkout">
+    Complete NFT checkout implementation guide
+  </Card>
+  <Card title="Embedded Wallets" icon="wallet" href="/guides/embedded-wallets">
+    Create wallets for users automatically
+  </Card>
+</CardGroup>

@@ -1,0 +1,270 @@
+---
+title: 'Configuration'
+description: 'Configuration options for the Server SDK authentication'
+---
+
+# Configuration
+
+The Server SDK provides configuration options for customizing authentication behavior, cookie settings, and token refresh routes.
+
+## CrossmintAuthServerOptions
+
+Configuration object passed to `CrossmintAuth.from()`.
+
+```typescript
+type CrossmintAuthServerOptions = {
+  refreshRoute?: string;
+  cookieOptions?: CookieOptions;
+};
+```
+
+### refreshRoute
+
+<ParamField path="refreshRoute" type="string">
+  Custom route for token refresh. When set, the SDK uses your custom endpoint instead of the default Crossmint refresh endpoint.
+</ParamField>
+
+**Default:** `null` (uses Crossmint's default refresh endpoint)
+
+#### Example
+
+```javascript
+const auth = CrossmintAuth.from(crossmint, {
+  refreshRoute: '/api/auth/refresh'
+});
+```
+
+When using a custom refresh route, your endpoint should:
+1. Accept POST requests with a refresh token
+2. Call the Crossmint refresh endpoint or handle token refresh
+3. Return refreshed authentication material
+
+### cookieOptions
+
+<ParamField path="cookieOptions" type="CookieOptions">
+  Configuration for authentication cookies. Controls security, expiration, and domain settings.
+</ParamField>
+
+**Default:** `{}` (uses secure defaults)
+
+## CookieOptions
+
+Configuration for HTTP cookies used to store authentication tokens.
+
+```typescript
+type CookieOptions = {
+  expiresAt?: string;
+  httpOnly?: boolean;
+  secure?: boolean;
+  sameSite?: 'Lax' | 'Strict' | 'None';
+  domain?: string;
+};
+```
+
+### expiresAt
+
+<ParamField path="expiresAt" type="string">
+  ISO 8601 timestamp for cookie expiration. If not provided, uses the refresh token's expiration time.
+</ParamField>
+
+**Default:** Matches refresh token expiration
+
+**Example:**
+```javascript
+cookieOptions: {
+  expiresAt: '2024-12-31T23:59:59Z'
+}
+```
+
+### httpOnly
+
+<ParamField path="httpOnly" type="boolean">
+  When `true`, prevents JavaScript access to cookies. Recommended for security.
+</ParamField>
+
+**Default:** `true` (recommended)
+
+**Example:**
+```javascript
+cookieOptions: {
+  httpOnly: true
+}
+```
+
+<Warning>
+Setting `httpOnly: false` exposes tokens to XSS attacks. Only disable this if you have a specific requirement and understand the security implications.
+</Warning>
+
+### secure
+
+<ParamField path="secure" type="boolean">
+  When `true`, cookies are only sent over HTTPS connections.
+</ParamField>
+
+**Default:** `false`
+
+**Example:**
+```javascript
+cookieOptions: {
+  secure: true
+}
+```
+
+<Info>
+Always set `secure: true` in production environments. Set to `false` only for local development over HTTP.
+</Info>
+
+### sameSite
+
+<ParamField path="sameSite" type="'Lax' | 'Strict' | 'None'">
+  Controls when cookies are sent with cross-site requests.
+
+  - `Lax`: Cookies sent with top-level navigation and same-site requests (recommended)
+  - `Strict`: Cookies only sent with same-site requests
+  - `None`: Cookies sent with all requests (requires `secure: true`)
+</ParamField>
+
+**Default:** `Lax`
+
+**Example:**
+```javascript
+cookieOptions: {
+  sameSite: 'Lax'
+}
+```
+
+<Tip>
+Use `sameSite: 'Lax'` for most applications. Use `sameSite: 'None'` only if you need to support cross-origin requests and ensure `secure: true` is set.
+</Tip>
+
+### domain
+
+<ParamField path="domain" type="string">
+  Domain for which the cookie is valid. Allows cookies to be shared across subdomains.
+</ParamField>
+
+**Default:** Current domain only
+
+**Example:**
+```javascript
+cookieOptions: {
+  domain: '.example.com' // Shares cookies across *.example.com
+}
+```
+
+<Note>
+Include the leading dot (`.example.com`) to make cookies available to all subdomains.
+</Note>
+
+## Complete configuration example
+
+### Production configuration
+
+```javascript
+import { CrossmintAuth } from '@crossmint/server-sdk';
+import { Crossmint } from '@crossmint/common-sdk-base';
+
+const crossmint = new Crossmint({
+  apiKey: process.env.CROSSMINT_API_KEY
+});
+
+const auth = CrossmintAuth.from(crossmint, {
+  refreshRoute: '/api/auth/refresh',
+  cookieOptions: {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'Lax',
+    domain: '.example.com'
+  }
+});
+```
+
+### Development configuration
+
+```javascript
+const auth = CrossmintAuth.from(crossmint, {
+  cookieOptions: {
+    httpOnly: true,
+    secure: false, // Allow HTTP for local development
+    sameSite: 'Lax'
+  }
+});
+```
+
+### Minimal configuration
+
+```javascript
+// Uses secure defaults
+const auth = CrossmintAuth.from(crossmint);
+```
+
+## Cookie names
+
+The SDK stores authentication material in the following cookies:
+
+- `crossmint_jwt` - JWT access token
+- `crossmint_refresh_token` - Refresh token
+
+These cookie names are managed automatically by the SDK.
+
+## Security best practices
+
+<AccordionGroup>
+  <Accordion title="Always use httpOnly cookies">
+    Set `httpOnly: true` to prevent JavaScript access and protect against XSS attacks.
+
+    ```javascript
+    cookieOptions: {
+      httpOnly: true
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Enable secure in production">
+    Set `secure: true` in production to ensure cookies are only sent over HTTPS.
+
+    ```javascript
+    cookieOptions: {
+      secure: process.env.NODE_ENV === 'production'
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Use appropriate sameSite setting">
+    Use `sameSite: 'Lax'` for most applications, or `sameSite: 'Strict'` for maximum security.
+
+    ```javascript
+    cookieOptions: {
+      sameSite: 'Lax'
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Limit cookie domain scope">
+    Only set the `domain` option if you need to share cookies across subdomains.
+
+    ```javascript
+    // Only if needed for subdomains
+    cookieOptions: {
+      domain: '.example.com'
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Runtime compatibility
+
+The Server SDK works with both Node.js and Web API environments:
+
+- **Node.js**: Express, Fastify, Next.js API routes (Pages Router)
+- **Web API**: Next.js App Router, Vercel Edge Functions, Cloudflare Workers
+
+The SDK automatically detects the runtime and uses the appropriate request/response adapters.
+
+```javascript
+// Works in both Node.js and Edge runtimes
+export async function GET(request) {
+  const session = await auth.getSession(request);
+  return Response.json({ userId: session.userId });
+}
+```

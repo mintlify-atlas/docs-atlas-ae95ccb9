@@ -1,0 +1,536 @@
+---
+title: "React UI SDK"
+description: "Complete React SDK with pre-built UI components for authentication, wallets, and checkout"
+---
+
+## Installation
+
+```bash
+npm install @crossmint/client-sdk-react-ui
+```
+
+## Setup
+
+Wrap your application with `CrossmintProvider` to initialize the SDK:
+
+```tsx
+import { CrossmintProvider } from '@crossmint/client-sdk-react-ui';
+
+function App() {
+  return (
+    <CrossmintProvider apiKey="YOUR_API_KEY">
+      {/* Your app components */}
+    </CrossmintProvider>
+  );
+}
+```
+
+### Provider Props
+
+<ParamField path="apiKey" type="string" required>
+  Your Crossmint API key from the [Developer Console](https://www.crossmint.com/console)
+</ParamField>
+
+<ParamField path="consoleLogLevel" type="'debug' | 'info' | 'warn' | 'error' | 'silent'" default="debug">
+  Minimum log level for console output. Set to `"silent"` to suppress all logs.
+</ParamField>
+
+<ParamField path="overrideBaseUrl" type="string">
+  Override the default API base URL (for testing purposes)
+</ParamField>
+
+## Authentication
+
+### CrossmintAuthProvider
+
+Enables authentication with multiple methods including email, OAuth, and Web3 wallets.
+
+```tsx
+import { CrossmintAuthProvider } from '@crossmint/client-sdk-react-ui';
+
+function App() {
+  return (
+    <CrossmintProvider apiKey="YOUR_API_KEY">
+      <CrossmintAuthProvider
+        loginMethods={['email', 'google', 'twitter', 'farcaster', 'web3-metamask']}
+        onLoginSuccess={(user) => console.log('Logged in:', user)}
+      >
+        {/* Your app */}
+      </CrossmintAuthProvider>
+    </CrossmintProvider>
+  );
+}
+```
+
+#### Props
+
+<ParamField path="loginMethods" type="array" default={['email', 'google']}>
+  Available login methods. Options:
+  - `'email'` - Email OTP authentication
+  - `'google'` - Google OAuth
+  - `'twitter'` - Twitter OAuth
+  - `'farcaster'` - Farcaster Sign In With Farcaster
+  - `'web3-metamask'` - MetaMask wallet
+  - `'web3-coinbase'` - Coinbase Wallet
+  - `'web3-walletconnect'` - WalletConnect
+</ParamField>
+
+<ParamField path="appearance" type="UIConfig">
+  Customize the auth UI appearance
+  ```tsx
+  appearance={{
+    colors: {
+      textPrimary: '#000000',
+      textSecondary: '#666666',
+      accent: '#00D091',
+    },
+  }}
+  ```
+</ParamField>
+
+<ParamField path="onLoginSuccess" type="(user) => void">
+  Callback fired when user successfully authenticates
+</ParamField>
+
+<ParamField path="authModalTitle" type="string">
+  Custom title for the authentication modal
+</ParamField>
+
+<ParamField path="termsOfServiceText" type="string">
+  Custom terms of service text shown during authentication
+</ParamField>
+
+<ParamField path="prefetchOAuthUrls" type="boolean" default={true}>
+  Whether to prefetch OAuth URLs for faster login
+</ParamField>
+
+### useCrossmintAuth Hook
+
+Access authentication state and methods:
+
+```tsx
+import { useCrossmintAuth } from '@crossmint/client-sdk-react-ui';
+
+function LoginButton() {
+  const { login, logout, status, user, jwt } = useCrossmintAuth();
+
+  if (status === 'authenticated') {
+    return (
+      <div>
+        <p>Logged in as {user?.email}</p>
+        <button onClick={logout}>Sign Out</button>
+      </div>
+    );
+  }
+
+  return (
+    <button onClick={() => login()}>Sign In</button>
+  );
+}
+```
+
+#### Return Values
+
+<ResponseField name="status" type="'initializing' | 'authenticated' | 'not-authenticated'">
+  Current authentication status
+</ResponseField>
+
+<ResponseField name="user" type="SDKExternalUser | undefined">
+  Authenticated user object with `email`, `userId`, and `linkedAccounts`
+</ResponseField>
+
+<ResponseField name="jwt" type="string | undefined">
+  JWT token for the authenticated user
+</ResponseField>
+
+<ResponseField name="login" type="(defaultEmail?: string) => void">
+  Opens the authentication modal. Optionally pre-fill email.
+</ResponseField>
+
+<ResponseField name="logout" type="() => Promise<void>">
+  Signs out the current user
+</ResponseField>
+
+<ResponseField name="experimental_loginWithOAuth" type="(provider: OAuthProvider) => Promise<void>">
+  Programmatically trigger OAuth login for a specific provider
+</ResponseField>
+
+### EmbeddedAuthForm Component
+
+Embedded authentication form for custom layouts:
+
+```tsx
+import { EmbeddedAuthForm } from '@crossmint/client-sdk-react-ui';
+
+function CustomAuthPage() {
+  return (
+    <div className="auth-container">
+      <h1>Sign In</h1>
+      <EmbeddedAuthForm />
+    </div>
+  );
+}
+```
+
+## Wallet Management
+
+### CrossmintWalletProvider
+
+Manages custodial wallet creation and transactions.
+
+```tsx
+import { CrossmintWalletProvider } from '@crossmint/client-sdk-react-ui';
+
+function App() {
+  return (
+    <CrossmintProvider apiKey="YOUR_API_KEY">
+      <CrossmintAuthProvider>
+        <CrossmintWalletProvider
+          createOnLogin={{ chain: 'ethereum' }}
+          callbacks={{
+            onWalletCreationStart: async () => console.log('Creating wallet...'),
+            onTransactionStart: async () => console.log('Transaction starting...'),
+          }}
+        >
+          {/* Your app */}
+        </CrossmintWalletProvider>
+      </CrossmintAuthProvider>
+    </CrossmintProvider>
+  );
+}
+```
+
+#### Props
+
+<ParamField path="createOnLogin" type="CreateOnLogin">
+  Automatically create a wallet when user logs in
+  ```tsx
+  createOnLogin={{ chain: 'ethereum' | 'solana' | 'stellar' }}
+  ```
+</ParamField>
+
+<ParamField path="showPasskeyHelpers" type="boolean" default={true}>
+  Show UI helpers for passkey creation and management
+</ParamField>
+
+<ParamField path="appearance" type="UIConfig">
+  Customize wallet UI appearance
+</ParamField>
+
+<ParamField path="callbacks" type="object">
+  Lifecycle callbacks:
+  - `onWalletCreationStart` - Called before wallet creation
+  - `onTransactionStart` - Called before transaction signing
+</ParamField>
+
+### useWallet Hook
+
+Access wallet state and methods:
+
+```tsx
+import { useWallet } from '@crossmint/client-sdk-react-ui';
+import type { EVMWallet } from '@crossmint/client-sdk-react-ui';
+
+function WalletInfo() {
+  const { wallet, status } = useWallet<EVMWallet>();
+
+  if (status === 'not-loaded') {
+    return <div>No wallet</div>;
+  }
+
+  return (
+    <div>
+      <p>Address: {wallet.address}</p>
+      <p>Chain: {wallet.chain}</p>
+      <button onClick={async () => {
+        const balance = await wallet.getBalance();
+        console.log('Balance:', balance);
+      }}>
+        Get Balance
+      </button>
+    </div>
+  );
+}
+```
+
+#### Return Values
+
+<ResponseField name="wallet" type="Wallet">
+  Wallet instance (EVMWallet, SolanaWallet, or StellarWallet) with methods:
+  - `address` - Wallet address
+  - `chain` - Blockchain identifier
+  - `getBalance()` - Fetch wallet balance
+  - `signMessage(message)` - Sign arbitrary message
+  - `sendTransaction(tx)` - Send transaction
+</ResponseField>
+
+<ResponseField name="status" type="'not-loaded' | 'loading' | 'loaded'">
+  Current wallet loading status
+</ResponseField>
+
+### ExportPrivateKeyButton
+
+Pre-built button to export wallet private keys:
+
+```tsx
+import { ExportPrivateKeyButton } from '@crossmint/client-sdk-react-ui';
+
+function WalletSettings() {
+  return (
+    <div>
+      <h3>Wallet Security</h3>
+      <ExportPrivateKeyButton />
+    </div>
+  );
+}
+```
+
+## Checkout Components
+
+### CrossmintEmbeddedCheckout
+
+Embedded checkout iframe for accepting payments and minting NFTs:
+
+```tsx
+import { CrossmintEmbeddedCheckout } from '@crossmint/client-sdk-react-ui';
+
+function CheckoutPage() {
+  return (
+    <CrossmintEmbeddedCheckout
+      lineItems={{
+        collectionLocator: 'crossmint:collection-id',
+        callData: {
+          totalPrice: '0.1',
+          quantity: 1,
+        },
+      }}
+      payment={{
+        crypto: { enabled: true },
+        fiat: { enabled: true },
+      }}
+      recipient={{
+        email: 'user@example.com',
+        wallet: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb',
+      }}
+      onEvent={(event) => {
+        console.log('Checkout event:', event);
+      }}
+    />
+  );
+}
+```
+
+#### Props
+
+<ParamField path="lineItems" type="object" required>
+  Items to purchase:
+  ```tsx
+  {
+    collectionLocator: 'crossmint:collection-id',
+    callData: { totalPrice: '0.1', quantity: 1 }
+  }
+  ```
+</ParamField>
+
+<ParamField path="payment" type="object">
+  Payment method configuration:
+  ```tsx
+  {
+    crypto: { enabled: true },
+    fiat: { enabled: true }
+  }
+  ```
+</ParamField>
+
+<ParamField path="recipient" type="object">
+  Recipient details:
+  ```tsx
+  {
+    email: 'user@example.com',
+    wallet: '0x...' // Optional delivery address
+  }
+  ```
+</ParamField>
+
+<ParamField path="locale" type="string">
+  Checkout UI locale (e.g., 'en-US', 'es-ES')
+</ParamField>
+
+<ParamField path="appearance" type="object">
+  Customize checkout appearance
+</ParamField>
+
+<ParamField path="onEvent" type="(event) => void">
+  Callback for checkout events (e.g., 'order:created', 'order:completed')
+</ParamField>
+
+### CrossmintHostedCheckout
+
+Button that opens checkout in a popup window:
+
+```tsx
+import { CrossmintHostedCheckout } from '@crossmint/client-sdk-react-ui';
+
+function BuyButton() {
+  return (
+    <CrossmintHostedCheckout
+      lineItems={{ collectionLocator: 'collection-id' }}
+      payment={{ crypto: { enabled: true } }}
+    >
+      Buy Now
+    </CrossmintHostedCheckout>
+  );
+}
+```
+
+Accepts the same props as `CrossmintEmbeddedCheckout` plus all HTML button attributes.
+
+### useCrossmintCheckout Hook
+
+Access current checkout order state:
+
+```tsx
+import { useCrossmintCheckout } from '@crossmint/client-sdk-react-ui';
+
+function OrderStatus() {
+  const { order, orderClientSecret } = useCrossmintCheckout();
+
+  if (!order) return null;
+
+  return (
+    <div>
+      <p>Order ID: {order.id}</p>
+      <p>Status: {order.status}</p>
+      <p>Total: {order.totalPrice}</p>
+    </div>
+  );
+}
+```
+
+## NFT Display Components
+
+### CrossmintNFTCollectionView
+
+Display NFTs from a collection:
+
+```tsx
+import { CrossmintNFTCollectionView } from '@crossmint/client-sdk-react-ui';
+
+function MyNFTs() {
+  return (
+    <CrossmintNFTCollectionView
+      walletAddress="0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
+      chain="ethereum"
+    />
+  );
+}
+```
+
+### CrossmintNFTDetail
+
+Display details for a single NFT:
+
+```tsx
+import { CrossmintNFTDetail } from '@crossmint/client-sdk-react-ui';
+
+function NFTPage() {
+  return (
+    <CrossmintNFTDetail
+      tokenId="1"
+      contractAddress="0x..."
+      chain="ethereum"
+    />
+  );
+}
+```
+
+## Payment Management
+
+### CrossmintPaymentMethodManagement
+
+Component for managing saved payment methods:
+
+```tsx
+import { CrossmintPaymentMethodManagement } from '@crossmint/client-sdk-react-ui';
+
+function PaymentSettings() {
+  return (
+    <div>
+      <h2>Payment Methods</h2>
+      <CrossmintPaymentMethodManagement
+        onUpdate={(methods) => console.log('Updated:', methods)}
+      />
+    </div>
+  );
+}
+```
+
+## Hooks Reference
+
+See source at `/home/daytona/workspace/source/packages/client/ui/react-ui/src/hooks`
+
+### useCrossmint
+
+```tsx
+import { useCrossmint } from '@crossmint/client-sdk-react-ui';
+
+const { crossmint, experimental_customAuth } = useCrossmint();
+```
+
+Provides access to the core Crossmint SDK instance.
+
+### useAuth
+
+Alias for `useCrossmintAuth` - see [Authentication](#usecrossmintauth-hook) section.
+
+## Type Exports
+
+Key TypeScript types exported from the SDK:
+
+```tsx
+import type {
+  // Auth types
+  LoginMethod,
+  SDKExternalUser,
+  OAuthProvider,
+  
+  // Config types
+  CrossmintConfig,
+  CrossmintProviderProps,
+  
+  // Wallet types
+  EVMWallet,
+  SolanaWallet,
+  StellarWallet,
+  Wallet,
+  DelegatedSigner,
+  
+  // Transaction types
+  Transaction,
+  Signature,
+  Activity,
+  Balances,
+  Chain,
+  
+  // Event types
+  CrossmintEvent,
+  CrossmintEventMap,
+} from '@crossmint/client-sdk-react-ui';
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Auth SDK" icon="key" href="/client-sdk/auth">
+    Build custom authentication flows
+  </Card>
+  <Card title="React Native SDK" icon="mobile" href="/client-sdk/react-native-ui">
+    Learn about mobile integration
+  </Card>
+  <Card title="API Reference" icon="book" href="/api-reference">
+    Explore the complete API
+  </Card>
+  <Card title="Examples" icon="code" href="https://github.com/crossmint/examples">
+    View example applications
+  </Card>
+</CardGroup>

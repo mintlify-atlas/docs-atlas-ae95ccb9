@@ -1,0 +1,221 @@
+---
+title: 'CrossmintAuth'
+description: 'Server-side authentication class for managing user sessions and tokens'
+---
+
+# CrossmintAuth
+
+The `CrossmintAuthServer` class (exported as `CrossmintAuth`) provides server-side authentication functionality for managing user sessions, handling token refresh, and cookie management.
+
+## Installation
+
+```bash
+npm install @crossmint/server-sdk
+```
+
+## Initialization
+
+```javascript
+import { CrossmintAuth } from '@crossmint/server-sdk';
+import { Crossmint } from '@crossmint/common-sdk-base';
+
+const crossmint = new Crossmint({
+  apiKey: process.env.CROSSMINT_API_KEY
+});
+
+const auth = CrossmintAuth.from(crossmint, {
+  refreshRoute: '/api/auth/refresh',
+  cookieOptions: {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'Lax'
+  }
+});
+```
+
+## Constructor options
+
+<ParamField path="crossmint" type="Crossmint" required>
+  Crossmint SDK instance initialized with your API key.
+</ParamField>
+
+<ParamField path="options" type="CrossmintAuthServerOptions">
+  Configuration options for the authentication instance.
+
+  <Expandable title="properties">
+    <ParamField path="options.refreshRoute" type="string">
+      Custom route for token refresh. If not provided, uses the default Crossmint refresh endpoint.
+    </ParamField>
+
+    <ParamField path="options.cookieOptions" type="CookieOptions">
+      Cookie configuration options. See [Configuration](/api/server-sdk/configuration) for details.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Static methods
+
+### from()
+
+Creates a new `CrossmintAuth` instance.
+
+```javascript
+const auth = CrossmintAuth.from(crossmint, options);
+```
+
+<ParamField path="crossmint" type="Crossmint" required>
+  Crossmint SDK instance.
+</ParamField>
+
+<ParamField path="options" type="CrossmintAuthServerOptions">
+  Configuration options.
+</ParamField>
+
+**Returns:** `CrossmintAuthServer`
+
+## Instance methods
+
+See [Session Methods](/api/server-sdk/session-methods) for detailed documentation of `getSession()`, `logout()`, and `handleCustomRefresh()`.
+
+### getJwksUri()
+
+Returns the JWKS URI for JWT verification.
+
+```javascript
+const jwksUri = auth.getJwksUri();
+```
+
+**Returns:** `string` - The JWKS URI endpoint.
+
+### verifyCrossmintJwt()
+
+Verifies a Crossmint JWT token.
+
+```javascript
+const decoded = await auth.verifyCrossmintJwt(token, jwks);
+```
+
+<ParamField path="token" type="string" required>
+  The JWT token to verify.
+</ParamField>
+
+<ParamField path="jwks" type="JSONWebKeySet">
+  Optional JWKS for verification. If not provided, fetches from the JWKS URI.
+</ParamField>
+
+**Returns:** `Promise<JWTPayload>` - The decoded and verified JWT payload.
+
+### storeAuthMaterial()
+
+Stores authentication material in cookies.
+
+```javascript
+auth.storeAuthMaterial(response, authMaterial);
+```
+
+<ParamField path="response" type="GenericResponse" required>
+  The HTTP response object (Node.js `ServerResponse` or Web API `Response`).
+</ParamField>
+
+<ParamField path="authMaterial" type="AuthMaterial" required>
+  Authentication material containing JWT and refresh token.
+
+  <Expandable title="properties">
+    <ParamField path="authMaterial.jwt" type="string" required>
+      The JWT access token.
+    </ParamField>
+
+    <ParamField path="authMaterial.refreshToken" type="RefreshToken" required>
+      The refresh token object.
+
+      <Expandable title="properties">
+        <ParamField path="refreshToken.secret" type="string" required>
+          The refresh token secret.
+        </ParamField>
+
+        <ParamField path="refreshToken.expiresAt" type="string" required>
+          ISO 8601 timestamp of token expiration.
+        </ParamField>
+      </Expandable>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### getUser()
+
+Retrieves user information by external user ID.
+
+```javascript
+const user = await auth.getUser(externalUserId);
+```
+
+<ParamField path="externalUserId" type="string" required>
+  The external user ID to look up.
+</ParamField>
+
+**Returns:** `Promise<SDKExternalUser>` - The user object.
+
+## Type definitions
+
+### GenericRequest
+
+Accepts either Node.js `IncomingMessage` or Web API `Request` objects.
+
+```typescript
+type GenericRequest = IncomingMessage | Request;
+```
+
+### GenericResponse
+
+Accepts either Node.js `ServerResponse` or Web API `Response` objects.
+
+```typescript
+type GenericResponse = ServerResponse | Response;
+```
+
+### AuthMaterial
+
+```typescript
+type AuthMaterial = {
+  jwt: string;
+  refreshToken: RefreshToken;
+};
+
+type RefreshToken = {
+  secret: string;
+  expiresAt: string;
+};
+```
+
+### AuthMaterialBasic
+
+```typescript
+type AuthMaterialBasic = {
+  jwt?: string;
+  refreshToken: string;
+};
+```
+
+### AuthSession
+
+```typescript
+type AuthSession = {
+  jwt: string;
+  refreshToken: RefreshToken;
+  userId: string;
+};
+```
+
+## Error handling
+
+All methods may throw `CrossmintAuthenticationError` when authentication fails.
+
+```javascript
+try {
+  const session = await auth.getSession(request, response);
+} catch (error) {
+  if (error instanceof CrossmintAuthenticationError) {
+    console.error('Authentication failed:', error.message);
+  }
+}
+```

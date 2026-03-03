@@ -1,0 +1,182 @@
+---
+title: "CrossmintWallets"
+description: "Main SDK class for wallet management"
+---
+
+The `CrossmintWallets` class is the main entry point for the Wallets SDK. It provides methods to create, retrieve, and manage wallets across different blockchain networks.
+
+## Initialization
+
+### from()
+
+Initialize the Wallets SDK with Crossmint configuration.
+
+```typescript
+public static from(crossmint: Crossmint): CrossmintWallets
+```
+
+<ParamField path="crossmint" type="Crossmint" required>
+  Crossmint instance created using `createCrossmint()` from `@crossmint/common-sdk-base`
+</ParamField>
+
+<ResponseField name="CrossmintWallets" type="CrossmintWallets">
+  A new CrossmintWallets instance
+</ResponseField>
+
+#### Example
+
+```typescript
+import { createCrossmint } from "@crossmint/common-sdk-base";
+import { CrossmintWallets } from "@crossmint/wallets";
+
+const crossmint = createCrossmint({
+  apiKey: "your-api-key"
+});
+
+const wallets = CrossmintWallets.from(crossmint);
+```
+
+## Wallet Management
+
+### getOrCreateWallet()
+
+Get an existing wallet or create a new one. This method can only be called on the client side.
+
+```typescript
+public async getOrCreateWallet<C extends Chain>(
+  options: WalletArgsFor<C>
+): Promise<Wallet<C>>
+```
+
+<ParamField path="options" type="WalletArgsFor<C>" required>
+  Wallet configuration options
+  
+  <Expandable title="properties">
+    <ParamField path="chain" type="Chain" required>
+      The blockchain network (e.g., "ethereum", "polygon", "solana")
+    </ParamField>
+    
+    <ParamField path="signer" type="SignerConfigForChain<C>" required>
+      Signer configuration for authentication
+    </ParamField>
+    
+    <ParamField path="owner" type="string">
+      Optional owner identifier for the wallet
+    </ParamField>
+    
+    <ParamField path="plugins" type="WalletPlugin<C>[]">
+      Optional plugins for extended functionality
+    </ParamField>
+    
+    <ParamField path="options" type="WalletOptions">
+      Optional wallet configuration
+    </ParamField>
+    
+    <ParamField path="delegatedSigners" type="DelegatedSigner[]">
+      Optional delegated signers for the wallet
+    </ParamField>
+    
+    <ParamField path="alias" type="string">
+      Optional alias for the wallet
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ResponseField name="wallet" type="Wallet<C>">
+  A wallet instance for the specified chain
+</ResponseField>
+
+#### Example
+
+```typescript
+const wallet = await wallets.getOrCreateWallet({
+  chain: "ethereum",
+  signer: {
+    type: "evm-keypair",
+    privateKey: "0x..."
+  }
+});
+
+console.log("Wallet address:", wallet.address);
+```
+
+### getWallet()
+
+Get an existing wallet by its locator. This method can only be called on the server side.
+
+```typescript
+public async getWallet<C extends Chain>(
+  walletLocator: string,
+  options: WalletArgsFor<C>
+): Promise<Wallet<C>>
+```
+
+<ParamField path="walletLocator" type="string" required>
+  The wallet locator (typically the wallet address)
+</ParamField>
+
+<ParamField path="options" type="WalletArgsFor<C>" required>
+  Wallet configuration options (same as `getOrCreateWallet`)
+</ParamField>
+
+<ResponseField name="wallet" type="Wallet<C>">
+  The wallet instance if found
+</ResponseField>
+
+<ResponseField name="error" type="WalletNotAvailableError">
+  Thrown if the wallet is not found
+</ResponseField>
+
+#### Example
+
+```typescript
+const wallet = await wallets.getWallet(
+  "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+  {
+    chain: "ethereum",
+    signer: {
+      type: "api-key"
+    }
+  }
+);
+```
+
+### createWallet()
+
+Create a new wallet. This method can only be called on the server side.
+
+```typescript
+public async createWallet<C extends Chain>(
+  options: WalletArgsFor<C>
+): Promise<Wallet<C>>
+```
+
+<ParamField path="options" type="WalletArgsFor<C>" required>
+  Wallet configuration options (same as `getOrCreateWallet`)
+</ParamField>
+
+<ResponseField name="wallet" type="Wallet<C>">
+  A new wallet instance
+</ResponseField>
+
+#### Example
+
+```typescript
+const wallet = await wallets.createWallet({
+  chain: "polygon",
+  signer: {
+    type: "api-key"
+  },
+  owner: "user@example.com"
+});
+
+console.log("New wallet created:", wallet.address);
+```
+
+## Related Types
+
+- [Wallet](/api/wallets-sdk/wallet) - Base wallet class
+- [EVMWallet](/api/wallets-sdk/evm-wallet) - EVM-specific wallet
+- [SolanaWallet](/api/wallets-sdk/solana-wallet) - Solana-specific wallet
+- [StellarWallet](/api/wallets-sdk/stellar-wallet) - Stellar-specific wallet
+- [Types](/api/wallets-sdk/types) - Type definitions

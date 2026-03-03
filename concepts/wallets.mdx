@@ -1,0 +1,408 @@
+---
+title: Wallets
+description: Understand wallet types, embedded wallets, and multi-chain support in Crossmint SDK
+---
+
+# Wallets
+
+Crossmint SDK provides embedded smart wallets that work across multiple blockchain ecosystems. Wallets are non-custodial, recoverable, and can be created with email, phone, or social login.
+
+## Wallet Types
+
+Crossmint supports three blockchain wallet types:
+
+### EVM Wallets
+
+Ethereum Virtual Machine (EVM) compatible wallets support all EVM-based chains.
+
+```typescript
+import { EVMWallet } from "@crossmint/client-sdk-wallets";
+
+const wallet = await crossmint.wallets.get({
+  chain: "base", // or "polygon", "arbitrum", etc.
+  signer: {
+    type: "email",
+    email: "user@example.com"
+  }
+});
+
+const evmWallet = EVMWallet.from(wallet);
+
+// Send a transaction
+const tx = await evmWallet.sendTransaction({
+  to: "0x123...",
+  value: BigInt(1000000000000000000), // 1 ETH in wei
+  data: "0x"
+});
+
+// Sign a message
+const signature = await evmWallet.signMessage({
+  message: "Hello, Crossmint!"
+});
+
+// Sign typed data (EIP-712)
+const typedSignature = await evmWallet.signTypedData({
+  domain: {
+    name: "MyDApp",
+    version: "1",
+    chainId: 8453n,
+    verifyingContract: "0x123..."
+  },
+  types: {
+    Message: [
+      { name: "content", type: "string" }
+    ]
+  },
+  primaryType: "Message",
+  message: {
+    content: "Hello!"
+  },
+  chain: "base"
+});
+```
+
+<Note>
+EVM wallets are **smart contract wallets** (ERC-4337 account abstraction), not EOAs. They support features like gas sponsorship, batched transactions, and social recovery.
+</Note>
+
+### Solana Wallets
+
+Solana-native wallets for the Solana blockchain.
+
+```typescript
+import { SolanaWallet } from "@crossmint/client-sdk-wallets";
+import { Transaction } from "@solana/web3.js";
+
+const wallet = await crossmint.wallets.get({
+  chain: "solana",
+  signer: {
+    type: "email",
+    email: "user@example.com"
+  }
+});
+
+const solanaWallet = SolanaWallet.from(wallet);
+
+// Send a transaction
+const transaction = new Transaction();
+// ... add instructions to transaction
+
+const tx = await solanaWallet.sendTransaction({
+  transaction
+});
+
+// Or use serialized transaction
+const tx2 = await solanaWallet.sendTransaction({
+  serializedTransaction: bs58.encode(transaction.serialize())
+});
+```
+
+### Stellar Wallets
+
+Stellar network wallets for the Stellar blockchain.
+
+```typescript
+import { StellarWallet } from "@crossmint/client-sdk-wallets";
+
+const wallet = await crossmint.wallets.get({
+  chain: "stellar",
+  signer: {
+    type: "email",
+    email: "user@example.com"
+  }
+});
+
+const stellarWallet = StellarWallet.from(wallet);
+```
+
+## Embedded Wallets
+
+Embedded wallets are **non-custodial smart wallets** created and managed by Crossmint, but controlled by your users. They offer a seamless Web2-like experience while maintaining Web3 security.
+
+### Key Features
+
+<CardGroup cols={2}>
+  <Card title="Non-Custodial" icon="shield-check">
+    Users control their wallets through authentication. Crossmint never has access to private keys.
+  </Card>
+  
+  <Card title="Social Recovery" icon="users">
+    Recover wallets using email/phone instead of seed phrases.
+  </Card>
+  
+  <Card title="Multi-Chain" icon="layer-group">
+    One wallet address works across all supported EVM chains.
+  </Card>
+  
+  <Card title="Gas Sponsorship" icon="gas-pump">
+    Sponsor gas fees for your users' transactions.
+  </Card>
+</CardGroup>
+
+### Creating Wallets
+
+```typescript
+import { createCrossmint } from "@crossmint/client-sdk-base";
+
+const crossmint = createCrossmint({
+  apiKey: "your-api-key"
+});
+
+const wallet = await crossmint.wallets.get({
+  chain: "base",
+  signer: {
+    type: "email",
+    email: "user@example.com",
+    onAuthRequired: async (needsAuth, sendOtp, verifyOtp, reject) => {
+      if (needsAuth) {
+        await sendOtp();
+        const otp = await promptUserForOtp(); // Your UI logic
+        await verifyOtp(otp);
+      }
+    }
+  }
+});
+
+console.log("Wallet address:", wallet.address);
+```
+
+<Info>
+The `get()` method creates a wallet if it doesn't exist, or returns the existing wallet for the authenticated user.
+</Info>
+
+### Wallet Aliasing
+
+Create multiple wallets for the same user using aliases:
+
+```typescript
+// Main wallet
+const mainWallet = await crossmint.wallets.get({
+  chain: "base",
+  signer: { type: "email", email: "user@example.com" }
+});
+
+// Gaming wallet with alias
+const gamingWallet = await crossmint.wallets.get({
+  chain: "base",
+  signer: { type: "email", email: "user@example.com" },
+  alias: "gaming"
+});
+
+// Trading wallet with alias
+const tradingWallet = await crossmint.wallets.get({
+  chain: "base",
+  signer: { type: "email", email: "user@example.com" },
+  alias: "trading"
+});
+```
+
+## Common Wallet Operations
+
+### Check Balances
+
+```typescript
+const balances = await wallet.balances(["usdc", "weth"]);
+
+console.log("Native token:", balances.nativeToken); // ETH, SOL, or XLM
+console.log("USDC:", balances.usdc);
+console.log("Other tokens:", balances.tokens);
+```
+
+The `balances()` method returns:
+
+```typescript
+type Balances = {
+  nativeToken: TokenBalance; // Always included
+  usdc: TokenBalance; // Always included
+  tokens: TokenBalance[]; // Additional requested tokens
+};
+
+type TokenBalance = {
+  symbol: string;
+  name: string;
+  amount: string; // Decimal amount (e.g., "1.5")
+  decimals: number;
+  rawAmount: string; // Wei/lamports amount
+  contractAddress?: string; // EVM only
+  mintHash?: string; // Solana only
+  contractId?: string; // Stellar only
+};
+```
+
+### Send Tokens
+
+```typescript
+// Send to wallet address
+const tx1 = await wallet.send(
+  "0x123...", // recipient address
+  "usdc", // token symbol or contract address
+  "10.5" // amount in decimal units
+);
+
+// Send to email (user locator)
+const tx2 = await wallet.send(
+  { email: "recipient@example.com" },
+  "usdc",
+  "10.5"
+);
+
+// Send to phone
+const tx3 = await wallet.send(
+  { phone: "+1234567890" },
+  "usdc",
+  "10.5"
+);
+
+// Send to Crossmint user ID
+const tx4 = await wallet.send(
+  { userId: "cm_user_123..." },
+  "usdc",
+  "10.5"
+);
+```
+
+<Note>
+Sending to email/phone automatically creates a wallet for the recipient if they don't have one.
+</Note>
+
+### View Transaction History
+
+```typescript
+// Get all transactions
+const transactions = await wallet.experimental_transactions();
+
+// Get specific transaction
+const tx = await wallet.experimental_transaction("tx_123...");
+console.log(tx.status, tx.onChain.txId);
+```
+
+### View NFTs
+
+```typescript
+const nfts = await wallet.experimental_nfts({
+  perPage: 10,
+  page: 1
+});
+
+console.log("Total NFTs:", nfts.totalCount);
+console.log("NFTs:", nfts.nfts);
+```
+
+### View Activity
+
+```typescript
+const activity = await wallet.experimental_activity();
+
+console.log("Transactions:", activity.transactions);
+console.log("Transfers:", activity.transfers);
+```
+
+## Advanced Features
+
+### Prepare Transactions Without Executing
+
+```typescript
+// Prepare a transaction
+const prepared = await wallet.send(
+  "0x123...",
+  "usdc",
+  "10",
+  {
+    experimental_prepareOnly: true
+  }
+);
+
+console.log("Transaction ID:", prepared.transactionId);
+
+// Later, approve and execute
+const executed = await wallet.approve({
+  transactionId: prepared.transactionId
+});
+
+console.log("Hash:", executed.hash);
+```
+
+### Delegated Signers
+
+Add additional signers to a wallet for multi-sig functionality:
+
+```typescript
+// Add a delegated signer
+await wallet.addDelegatedSigner({
+  signer: "0xdelegated..."
+});
+
+// List delegated signers
+const signers = await wallet.delegatedSigners();
+console.log("Delegated signers:", signers);
+```
+
+<Info>
+Delegated signers are additional addresses that can authorize transactions for the wallet. Learn more in the [Signers](/concepts/signers) documentation.
+</Info>
+
+### Server-Side Wallet Access
+
+Access wallets from your backend using server API keys:
+
+```typescript
+import { createCrossmint } from "@crossmint/server-sdk-base";
+
+const crossmint = createCrossmint({
+  apiKey: "your-server-api-key"
+});
+
+// Access wallet by address
+const wallet = await crossmint.wallets.get(
+  "0x123...", // wallet address
+  { chain: "base" }
+);
+
+const balances = await wallet.balances();
+```
+
+## Type Definitions
+
+Relevant TypeScript types from the source code:
+
+```typescript
+// From packages/wallets/src/wallets/types.ts
+
+export type WalletArgsFor<C extends Chain> = {
+  chain: C;
+  signer: SignerConfigForChain<C>;
+  owner?: string;
+  plugins?: WalletPlugin<C>[];
+  options?: WalletOptions;
+  delegatedSigners?: Array<DelegatedSigner>;
+  alias?: string;
+};
+
+export type Transaction = {
+  hash: string;
+  explorerLink: string;
+  transactionId: string;
+};
+
+export type Balances<C extends Chain = Chain> = {
+  nativeToken: TokenBalance<C>;
+  usdc: TokenBalance<C>;
+  tokens: TokenBalance<C>[];
+};
+
+export type DelegatedSigner = {
+  signer: string;
+};
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Supported Chains" href="/concepts/chains" icon="link">
+    View the complete list of supported blockchain networks
+  </Card>
+  
+  <Card title="Signer Configuration" href="/concepts/signers" icon="key">
+    Configure email, phone, passkey, or external wallet signers
+  </Card>
+</CardGroup>

@@ -1,0 +1,158 @@
+---
+title: "Client SDKs Overview"
+description: "Build user-facing apps with Crossmint's React, React Native, and headless SDKs"
+---
+
+Crossmint provides client-side SDKs for building user-facing applications with embedded wallets, authentication, checkout, and verifiable credentials.
+
+## Available SDKs
+
+<CardGroup cols={2}>
+  <Card title="React UI SDK" icon="react" href="/client-sdk/react-ui">
+    Complete React SDK with pre-built UI components for web applications
+  </Card>
+  <Card title="React Native UI SDK" icon="mobile" href="/client-sdk/react-native-ui">
+    Mobile-first SDK for iOS and Android apps with Expo support
+  </Card>
+  <Card title="Auth SDK" icon="key" href="/client-sdk/auth">
+    Headless authentication SDK for custom implementations
+  </Card>
+  <Card title="Verifiable Credentials" icon="shield-check" href="/client-sdk/verifiable-credentials">
+    SDK for issuing, presenting, and verifying credentials on-chain
+  </Card>
+</CardGroup>
+
+## Quick Start
+
+<Tabs>
+  <Tab title="React">
+    ```bash
+    npm install @crossmint/client-sdk-react-ui
+    ```
+
+    ```tsx
+    import { CrossmintProvider } from '@crossmint/client-sdk-react-ui';
+
+    export default function App() {
+      return (
+        <CrossmintProvider apiKey="YOUR_API_KEY">
+          {/* Your app */}
+        </CrossmintProvider>
+      );
+    }
+    ```
+  </Tab>
+  <Tab title="React Native">
+    ```bash
+    npm install @crossmint/client-sdk-react-native-ui
+    ```
+
+    ```tsx
+    import { CrossmintProvider } from '@crossmint/client-sdk-react-native-ui';
+
+    export default function App() {
+      return (
+        <CrossmintProvider apiKey="YOUR_API_KEY">
+          {/* Your app */}
+        </CrossmintProvider>
+      );
+    }
+    ```
+  </Tab>
+  <Tab title="Headless Auth">
+    ```bash
+    npm install @crossmint/client-sdk-auth
+    ```
+
+    ```typescript
+    import { createCrossmint, CrossmintAuth } from '@crossmint/client-sdk-auth';
+
+    const crossmint = createCrossmint({ apiKey: 'YOUR_API_KEY' });
+    const auth = CrossmintAuth.from(crossmint);
+    ```
+  </Tab>
+</Tabs>
+
+## Core Features
+
+### Authentication
+
+Multiple authentication methods including email, OAuth providers (Google, Twitter, Farcaster), and Web3 wallets.
+
+```tsx
+import { useCrossmintAuth } from '@crossmint/client-sdk-react-ui';
+
+function LoginButton() {
+  const { login, status } = useCrossmintAuth();
+  
+  return (
+    <button onClick={() => login()}>Sign In</button>
+  );
+}
+```
+
+### Embedded Wallets
+
+Self-custodial wallets for EVM, Solana, and Stellar chains with built-in transaction signing.
+
+```tsx
+import { useWallet } from '@crossmint/client-sdk-react-ui';
+
+function WalletInfo() {
+  const { wallet } = useWallet();
+  
+  return <div>Address: {wallet?.address}</div>;
+}
+```
+
+### Checkout Components
+
+Pre-built checkout UI for accepting payments and minting NFTs.
+
+```tsx
+import { CrossmintEmbeddedCheckout } from '@crossmint/client-sdk-react-ui';
+
+<CrossmintEmbeddedCheckout
+  lineItems={{ collectionLocator: 'collection-id' }}
+  payment={{ crypto: { enabled: true } }}
+/>
+```
+
+### Verifiable Credentials
+
+Fetch, decrypt, and verify on-chain credentials.
+
+```typescript
+import { getCredentialNfts, verifyCredential } from '@crossmint/client-sdk-verifiable-credentials';
+
+const credentials = await getCredentialNfts('polygon', walletAddress);
+const isValid = await verifyCredential(credential);
+```
+
+## SDK Comparison
+
+| Feature | React UI | React Native UI | Auth SDK |
+|---------|----------|-----------------|----------|
+| Pre-built UI | ✅ | ✅ | ❌ |
+| Headless API | ✅ | ✅ | ✅ |
+| Platform | Web | iOS/Android | Universal |
+| Auth Methods | All | All | All |
+| Wallet Support | Full | Full | N/A |
+| Checkout | Full | Full | N/A |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="React UI SDK" icon="code" href="/client-sdk/react-ui">
+    Learn about React components and hooks
+  </Card>
+  <Card title="Authentication Guide" icon="book" href="/client-sdk/auth">
+    Implement custom auth flows
+  </Card>
+  <Card title="API Reference" icon="brackets-curly" href="/api-reference">
+    Explore the complete API
+  </Card>
+  <Card title="Examples" icon="flask" href="https://github.com/crossmint/examples">
+    View example applications
+  </Card>
+</CardGroup>

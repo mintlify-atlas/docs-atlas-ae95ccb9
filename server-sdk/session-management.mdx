@@ -1,0 +1,237 @@
+---
+title: 'Session Management'
+description: 'Handle session validation, token refresh, and logout in your server-side applications'
+---
+
+The Crossmint Server SDK automatically manages user sessions by validating JWT tokens and refreshing them when they expire.
+
+## How Session Validation Works
+
+When you call `getSession()`, the SDK performs the following steps:
+
+<Steps>
+  <Step title="Retrieve authentication material">
+    The SDK extracts the JWT and refresh token from cookies or the provided request object.
+  </Step>
+
+  <Step title="Validate the JWT">
+    The SDK verifies the JWT signature and checks if it's expired.
+  </Step>
+
+  <Step title="Refresh if needed">
+    If the JWT is expired or invalid, the SDK automatically uses the refresh token to obtain a new JWT.
+  </Step>
+
+  <Step title="Store updated tokens">
+    If a response object is provided, the SDK stores the refreshed tokens in cookies.
+  </Step>
+</Steps>
+
+Source: `CrossmintAuthServer.ts:166`
+
+## Session Validation
+
+### Basic Session Validation
+
+The `getSession()` method automatically validates and refreshes sessions:
+
+```ts
+const { jwt, userId, refreshToken } = await crossmintAuth.getSession(request, response);
+```
+
+The returned object contains:
+- `jwt` - The validated (or refreshed) JWT token
+- `userId` - The user's unique identifier
+- `refreshToken` - The refresh token object with `secret` and `expiresAt`
+
+### Validation Without Auto-Refresh
+
+If you want to validate a JWT without automatic refresh, use `verifyCrossmintJwt()`:
+
+```ts
+try {
+    const decodedToken = await crossmintAuth.verifyCrossmintJwt(jwt);
+    const userId = decodedToken.sub;
+    // JWT is valid
+} catch (error) {
+    // JWT is invalid or expired
+}
+```
+
+## Token Refresh
+
+### Automatic Token Refresh
+
+The SDK automatically refreshes expired tokens when calling `getSession()`. No additional code is required:
+
+```ts
+// Automatically refreshes if JWT is expired
+const { jwt, userId } = await crossmintAuth.getSession(request, response);
+```
+
+### Manual Token Refresh
+
+You can manually refresh tokens using the `handleCustomRefresh()` method. This is useful for setting up custom refresh endpoints.
+
+<CodeGroup>
+```ts Next.js (Fetch API)
+export async function POST(request: NextRequest) {
+    return await crossmintAuth.handleCustomRefresh(request);
+}
+```
+
+```ts Express (Node.js API)
+app.post("/api/refresh", async (req, res) => {
+    await crossmintAuth.handleCustomRefresh(req, res);
+    res.end();
+});
+```
+</CodeGroup>
+
+Source: `README.md:89`
+
+<Warning>
+  For Fetch API environments, `handleCustomRefresh()` returns a Response object. For Node.js environments, you must provide the response object and call `res.end()` after the method completes.
+</Warning>
+
+## Logout
+
+The `logout()` method clears authentication material from cookies and optionally calls the Crossmint logout endpoint.
+
+### Logout in Fetch API Environments
+
+```ts Next.js
+export async function POST(request: NextRequest) {
+    return await crossmintAuth.logout(request);
+}
+```
+
+Source: `README.md:120`
+
+### Logout in Node.js API Environments
+
+```ts Express
+app.post("/api/logout", async (req, res) => {
+    await crossmintAuth.logout(req, res);
+    res.end();
+});
+```
+
+Source: `README.md:126`
+
+### What Happens During Logout
+
+<Steps>
+  <Step title="Call logout endpoint">
+    The SDK calls the Crossmint logout endpoint to invalidate the refresh token (if possible).
+  </Step>
+
+  <Step title="Clear cookies">
+    Authentication cookies are cleared by setting them to empty values with past expiration dates.
+  </Step>
+
+  <Step title="Return response">
+    A response object is returned with the cleared cookies.
+  </Step>
+</Steps>
+
+Source: `CrossmintAuthServer.ts:141`
+
+## Cookie Names
+
+The SDK uses the following cookie names by default:
+
+- `crossmint-session` - Stores the JWT token (not HttpOnly, accessible to the client SDK)
+- `crossmint-refresh-token` - Stores the refresh token (can be HttpOnly for security)
+
+## Session Error Handling
+
+When session validation or refresh fails, the SDK:
+
+1. Throws a `CrossmintAuthenticationError`
+2. Automatically clears cookies if a response object is provided
+3. Logs the error to the console
+
+```ts
+try {
+    const { jwt, userId } = await crossmintAuth.getSession(request, response);
+} catch (error) {
+    // Cookies are automatically cleared
+    // Redirect user to login page
+    return redirect("/login");
+}
+```
+
+## Complete Example: Protected Route
+
+<CodeGroup>
+```ts Next.js Middleware
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { createCrossmint, CrossmintAuth } from "@crossmint/server-sdk";
+
+const crossmint = createCrossmint({
+    apiKey: process.env.SERVER_CROSSMINT_API_KEY || "",
+});
+
+const crossmintAuth = CrossmintAuth.from(crossmint);
+
+export async function middleware(request: NextRequest) {
+    try {
+        const jwt = request.cookies.get("crossmint-session")?.value;
+        const refreshToken = request.cookies.get("crossmint-refresh-token")?.value;
+
+        const { userId } = await crossmintAuth.getSession({
+            jwt,
+            refreshToken,
+        });
+
+        // User is authenticated, continue
+        return NextResponse.next();
+    } catch (error) {
+        // Redirect to login if authentication fails
+        return NextResponse.redirect(new URL("/login", request.url));
+    }
+}
+
+export const config = {
+    matcher: "/dashboard/:path*",
+};
+```
+
+```ts Express Middleware
+import express from "express";
+import { createCrossmint, CrossmintAuth } from "@crossmint/server-sdk";
+
+const app = express();
+
+const crossmint = createCrossmint({
+    apiKey: process.env.SERVER_CROSSMINT_API_KEY || "",
+});
+
+const crossmintAuth = CrossmintAuth.from(crossmint);
+
+// Authentication middleware
+const requireAuth = async (req, res, next) => {
+    try {
+        const { jwt, userId } = await crossmintAuth.getSession(req, res);
+        req.userId = userId;
+        next();
+    } catch (error) {
+        res.status(401).json({ error: "Unauthorized" });
+    }
+};
+
+// Protected route
+app.get("/api/dashboard", requireAuth, async (req, res) => {
+    const user = await crossmintAuth.getUser(req.userId);
+    res.json({ user });
+});
+```
+</CodeGroup>
+
+## Next Steps
+
+<Card title="Custom Refresh Routes" icon="route" href="/server-sdk/custom-refresh-routes">
+  Set up custom refresh routes for enhanced security with HttpOnly cookies
+</Card>

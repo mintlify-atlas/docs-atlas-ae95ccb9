@@ -1,0 +1,411 @@
+---
+title: React Components
+description: Pre-built React components for authentication, checkout, and NFT display
+---
+
+## Overview
+
+The Crossmint React SDK provides ready-to-use components for common Web3 operations including authentication forms, embedded checkout, and NFT display.
+
+## Installation
+
+```bash
+npm install @crossmint/client-sdk-react-ui
+```
+
+## AuthForm
+
+A complete authentication form with support for multiple login methods.
+
+### Usage
+
+```tsx
+import { AuthForm } from '@crossmint/client-sdk-react-ui';
+import { useAuthForm } from '@crossmint/client-sdk-react-ui';
+
+function LoginPage() {
+  return (
+    <CrossmintProvider apiKey="your-api-key">
+      <CrossmintAuthProvider loginMethods={['email', 'google', 'farcaster']}>
+        <AuthForm />
+      </CrossmintAuthProvider>
+    </CrossmintProvider>
+  );
+}
+```
+
+### Props
+
+<ParamField path="style" type="React.CSSProperties" optional>
+  Custom CSS styles to apply to the form container
+</ParamField>
+
+### Features
+
+- Email OTP authentication with code input
+- OAuth providers (Google, Twitter, Farcaster)
+- Web3 wallet connection
+- Error display and validation
+- Customizable appearance via `CrossmintAuthProvider`
+- Terms of service text support
+- Responsive design
+
+---
+
+## CrossmintEmbeddedCheckout
+
+Embedded checkout component for NFT purchases with fiat and crypto payment support.
+
+### Usage with Existing Order
+
+```tsx
+import { CrossmintEmbeddedCheckout } from '@crossmint/client-sdk-react-ui';
+
+function CheckoutPage() {
+  return (
+    <CrossmintProvider apiKey="your-api-key">
+      <CrossmintEmbeddedCheckout
+        orderId="order_123"
+        clientSecret="cs_secret_456"
+        payment={{
+          fiat: { enabled: true },
+          crypto: { enabled: true }
+        }}
+      />
+    </CrossmintProvider>
+  );
+}
+```
+
+### Usage with New Order
+
+```tsx
+<CrossmintEmbeddedCheckout
+  lineItems={[
+    {
+      collectionLocator: 'crossmint:collection-id',
+      callData: { quantity: 1 }
+    }
+  ]}
+  recipient={{ email: 'buyer@example.com' }}
+  payment={{
+    fiat: { 
+      enabled: true,
+      defaultCurrency: 'usd',
+      allowedMethods: {
+        card: true,
+        applePay: true,
+        googlePay: true
+      }
+    },
+    crypto: { 
+      enabled: true,
+      defaultChain: 'ethereum',
+      defaultCurrency: 'eth'
+    },
+    defaultMethod: 'fiat'
+  }}
+  appearance={{
+    variables: {
+      borderRadius: '8px',
+      colors: {
+        accent: '#4F46E5'
+      }
+    }
+  }}
+/>
+```
+
+### Props
+
+<ParamField path="orderId" type="string">
+  Existing order ID. Required when using an existing order.
+</ParamField>
+
+<ParamField path="clientSecret" type="string" optional>
+  Client secret for order verification (for existing orders)
+</ParamField>
+
+<ParamField path="lineItems" type="EmbeddedCheckoutV3LineItem | EmbeddedCheckoutV3LineItem[]">
+  Items to purchase. Required when creating a new order.
+  
+  <Expandable title="Line item types">
+    ```typescript
+    type EmbeddedCheckoutV3LineItem =
+      | { collectionLocator: string; callData?: Record<string, any> }
+      | { tokenLocator: string; callData?: Record<string, any> }
+      | { productLocator: string }
+    ```
+  </Expandable>
+</ParamField>
+
+<ParamField path="recipient" type="EmbeddedCheckoutV3Recipient" optional>
+  Recipient information for the purchase
+  
+  <Expandable title="properties">
+    <ParamField path="email" type="string">
+      Recipient email address
+    </ParamField>
+    <ParamField path="walletAddress" type="string">
+      Recipient wallet address (alternative to email)
+    </ParamField>
+    <ParamField path="physicalAddress" type="object" optional>
+      Physical shipping address for physical items
+      
+      <Expandable title="properties">
+        <ParamField path="name" type="string" required />
+        <ParamField path="line1" type="string" required />
+        <ParamField path="line2" type="string" optional />
+        <ParamField path="city" type="string" required />
+        <ParamField path="state" type="string" required />
+        <ParamField path="postalCode" type="string" required />
+        <ParamField path="country" type="'US'" required />
+      </Expandable>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="payment" type="EmbeddedCheckoutV3Payment" required>
+  Payment configuration
+  
+  <Expandable title="properties">
+    <ParamField path="fiat" type="object" required>
+      <Expandable title="properties">
+        <ParamField path="enabled" type="boolean" required>
+          Enable fiat payment methods
+        </ParamField>
+        <ParamField path="defaultCurrency" type="Currency" optional>
+          Default fiat currency (e.g., 'usd', 'eur')
+        </ParamField>
+        <ParamField path="allowedMethods" type="object" optional>
+          <Expandable title="properties">
+            <ParamField path="card" type="boolean" optional />
+            <ParamField path="applePay" type="boolean" optional />
+            <ParamField path="googlePay" type="boolean" optional />
+          </Expandable>
+        </ParamField>
+      </Expandable>
+    </ParamField>
+    
+    <ParamField path="crypto" type="object" required>
+      <Expandable title="properties">
+        <ParamField path="enabled" type="boolean" required>
+          Enable crypto payment methods
+        </ParamField>
+        <ParamField path="defaultChain" type="BlockchainIncludingTestnet" optional>
+          Default blockchain (e.g., 'ethereum', 'polygon')
+        </ParamField>
+        <ParamField path="defaultCurrency" type="CryptoCurrency" optional>
+          Default crypto currency (e.g., 'eth', 'usdc')
+        </ParamField>
+        <ParamField path="payer" type="EmbeddedCheckoutPayer" optional>
+          Custom payer configuration for bringing your own wallet
+        </ParamField>
+      </Expandable>
+    </ParamField>
+    
+    <ParamField path="defaultMethod" type="'fiat' | 'crypto'" optional>
+      Default payment method tab
+    </ParamField>
+    
+    <ParamField path="receiptEmail" type="string" optional>
+      Email address for payment receipts
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="appearance" type="EmbeddedCheckoutV3Appearance" optional>
+  Customize the checkout UI
+  
+  <Expandable title="properties">
+    <ParamField path="variables" type="object" optional>
+      Global styling variables
+      
+      <Expandable title="properties">
+        <ParamField path="fontFamily" type="string" optional />
+        <ParamField path="borderRadius" type="string" optional />
+        <ParamField path="colors" type="object" optional>
+          <Expandable title="properties">
+            <ParamField path="accent" type="string" optional />
+            <ParamField path="textPrimary" type="string" optional />
+            <ParamField path="textSecondary" type="string" optional />
+            <ParamField path="backgroundPrimary" type="string" optional />
+            <ParamField path="danger" type="string" optional />
+          </Expandable>
+        </ParamField>
+      </Expandable>
+    </ParamField>
+    
+    <ParamField path="rules" type="object" optional>
+      Component-specific styling rules (PrimaryButton, Input, Tab, etc.)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="jwt" type="string" optional>
+  JWT token for authenticated purchases
+</ParamField>
+
+<ParamField path="locale" type="Locale" optional>
+  Locale for internationalization (e.g., 'en-US', 'es-ES')
+</ParamField>
+
+<ParamField path="metadata" type="JSONObject" optional>
+  Custom metadata to attach to the order
+</ParamField>
+
+---
+
+## CrossmintNFTCollectionView
+
+Displays all NFTs owned by specified wallets.
+
+### Usage
+
+```tsx
+import { CrossmintNFTCollectionView } from '@crossmint/client-sdk-react-ui';
+
+function MyNFTs() {
+  return (
+    <CrossmintProvider apiKey="your-api-key">
+      <CrossmintNFTCollectionView
+        wallets={[
+          { address: '0x1234...5678', chain: 'ethereum' },
+          { address: 'abc123...', chain: 'solana' }
+        ]}
+        uiConfig={{
+          colors: {
+            background: '#000000',
+            textPrimary: '#ffffff'
+          }
+        }}
+      />
+    </CrossmintProvider>
+  );
+}
+```
+
+### Props
+
+<ParamField path="wallets" type="Wallet[]" required>
+  Array of wallet addresses and chains to display NFTs from
+  
+  <Expandable title="Wallet type">
+    ```typescript
+    interface Wallet {
+      address: string;
+      chain: 'ethereum' | 'polygon' | 'solana' | 'base' | ...;
+    }
+    ```
+  </Expandable>
+</ParamField>
+
+<ParamField path="uiConfig" type="UIConfig" optional>
+  UI customization options
+  
+  <Expandable title="properties">
+    <ParamField path="colors" type="object" optional>
+      <Expandable title="properties">
+        <ParamField path="background" type="string" optional />
+        <ParamField path="textPrimary" type="string" optional />
+        <ParamField path="textSecondary" type="string" optional />
+      </Expandable>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="environment" type="string" optional>
+  Environment override (defaults to production)
+</ParamField>
+
+---
+
+## CrossmintNFTDetail
+
+Displays detailed information about a specific NFT.
+
+### Usage
+
+```tsx
+import { CrossmintNFTDetail } from '@crossmint/client-sdk-react-ui';
+
+function NFTDetailsPage() {
+  return (
+    <CrossmintProvider apiKey="your-api-key">
+      <CrossmintNFTDetail
+        nft={{
+          locator: 'ethereum:0x123...456:1'
+        }}
+        uiConfig={{
+          colors: {
+            background: '#f5f5f5',
+            textPrimary: '#000000'
+          }
+        }}
+      />
+    </CrossmintProvider>
+  );
+}
+```
+
+### Props
+
+<ParamField path="nft" type="NFTOrNFTLocator" required>
+  NFT to display (can be full NFT object or locator string)
+  
+  <Expandable title="NFTOrNFTLocator type">
+    ```typescript
+    type NFTOrNFTLocator = 
+      | { locator: string }
+      | { chain: string; contractAddress: string; tokenId: string }
+    ```
+  </Expandable>
+</ParamField>
+
+<ParamField path="uiConfig" type="UIConfig" optional>
+  UI customization options (same as CrossmintNFTCollectionView)
+</ParamField>
+
+<ParamField path="environment" type="string" optional>
+  Environment override (defaults to production)
+</ParamField>
+
+## Styling
+
+All components support extensive customization through their appearance/uiConfig props:
+
+```tsx
+// Auth form appearance
+<CrossmintAuthProvider
+  appearance={{
+    colors: {
+      accent: '#4F46E5',
+      textPrimary: '#000000',
+      textSecondary: '#666666',
+      danger: '#EF4444'
+    },
+    fontFamily: 'Inter, sans-serif'
+  }}
+>
+  <AuthForm />
+</CrossmintAuthProvider>
+
+// Checkout appearance
+<CrossmintEmbeddedCheckout
+  appearance={{
+    variables: {
+      borderRadius: '12px',
+      fontFamily: 'Roboto, sans-serif'
+    },
+    rules: {
+      PrimaryButton: {
+        colors: {
+          background: '#10B981',
+          text: '#ffffff'
+        }
+      }
+    }
+  }}
+  // ... other props
+/>
+```

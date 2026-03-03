@@ -1,0 +1,563 @@
+---
+title: "React Native UI SDK"
+description: "Mobile SDK with UI components for iOS and Android applications"
+---
+
+## Installation
+
+```bash
+npm install @crossmint/client-sdk-react-native-ui
+```
+
+### Peer Dependencies
+
+The SDK requires Expo and React Native:
+
+```bash
+npm install expo react-native
+```
+
+## Setup
+
+Wrap your application with `CrossmintProvider`:
+
+```tsx
+import { CrossmintProvider } from '@crossmint/client-sdk-react-native-ui';
+import { View } from 'react-native';
+
+export default function App() {
+  return (
+    <CrossmintProvider apiKey="YOUR_API_KEY">
+      <View>{/* Your app components */}</View>
+    </CrossmintProvider>
+  );
+}
+```
+
+### Provider Props
+
+<ParamField path="apiKey" type="string" required>
+  Your Crossmint API key from the [Developer Console](https://www.crossmint.com/console)
+</ParamField>
+
+<ParamField path="consoleLogLevel" type="'debug' | 'info' | 'warn' | 'error' | 'silent'" default="debug">
+  Minimum log level for console output
+</ParamField>
+
+<ParamField path="overrideBaseUrl" type="string">
+  Override the default API base URL
+</ParamField>
+
+## App Configuration
+
+The SDK automatically reads your app's bundle identifier from Expo config:
+
+```json app.json
+{
+  "expo": {
+    "ios": {
+      "bundleIdentifier": "com.yourcompany.yourapp"
+    },
+    "android": {
+      "package": "com.yourcompany.yourapp"
+    }
+  }
+}
+```
+
+See implementation at `/home/daytona/workspace/source/packages/client/ui/react-native/src/providers/CrossmintProvider.tsx:32`
+
+## Authentication
+
+### CrossmintAuthProvider
+
+Enables authentication with multiple methods:
+
+```tsx
+import { 
+  CrossmintAuthProvider,
+  useCrossmintAuth 
+} from '@crossmint/client-sdk-react-native-ui';
+import { View, Button, Text } from 'react-native';
+
+function App() {
+  return (
+    <CrossmintProvider apiKey="YOUR_API_KEY">
+      <CrossmintAuthProvider
+        loginMethods={['email', 'google', 'twitter']}
+        onLoginSuccess={(user) => console.log('Logged in:', user)}
+      >
+        <AuthScreen />
+      </CrossmintAuthProvider>
+    </CrossmintProvider>
+  );
+}
+
+function AuthScreen() {
+  const { login, logout, status, user } = useCrossmintAuth();
+
+  if (status === 'authenticated') {
+    return (
+      <View>
+        <Text>Logged in as {user?.email}</Text>
+        <Button title="Sign Out" onPress={logout} />
+      </View>
+    );
+  }
+
+  return <Button title="Sign In" onPress={() => login()} />;
+}
+```
+
+#### Props
+
+<ParamField path="loginMethods" type="array" default={['email', 'google']}>
+  Available login methods:
+  - `'email'` - Email OTP authentication
+  - `'google'` - Google OAuth
+  - `'twitter'` - Twitter OAuth
+  - `'farcaster'` - Farcaster authentication
+</ParamField>
+
+<ParamField path="appearance" type="UIConfig">
+  Customize the auth UI appearance
+</ParamField>
+
+<ParamField path="onLoginSuccess" type="(user) => void">
+  Callback fired when user successfully authenticates
+</ParamField>
+
+<ParamField path="authModalTitle" type="string">
+  Custom title for the authentication modal
+</ParamField>
+
+### useCrossmintAuth Hook
+
+Access authentication state and methods:
+
+```tsx
+import { useCrossmintAuth } from '@crossmint/client-sdk-react-native-ui';
+import { View, Text, Button } from 'react-native';
+
+function LoginButton() {
+  const { login, logout, status, user, jwt } = useCrossmintAuth();
+
+  if (status === 'authenticated') {
+    return (
+      <View>
+        <Text>User: {user?.email}</Text>
+        <Text>JWT: {jwt?.slice(0, 20)}...</Text>
+        <Button title="Sign Out" onPress={logout} />
+      </View>
+    );
+  }
+
+  return <Button title="Sign In" onPress={() => login()} />;
+}
+```
+
+#### Return Values
+
+<ResponseField name="status" type="'initializing' | 'authenticated' | 'not-authenticated'">
+  Current authentication status
+</ResponseField>
+
+<ResponseField name="user" type="SDKExternalUser | undefined">
+  Authenticated user with `email`, `userId`, and `linkedAccounts`
+</ResponseField>
+
+<ResponseField name="jwt" type="string | undefined">
+  JWT token for the authenticated user
+</ResponseField>
+
+<ResponseField name="login" type="(defaultEmail?: string) => void">
+  Opens the authentication modal
+</ResponseField>
+
+<ResponseField name="logout" type="() => Promise<void>">
+  Signs out the current user
+</ResponseField>
+
+## Wallet Management
+
+### CrossmintWalletProvider
+
+Manages custodial wallet creation and transactions:
+
+```tsx
+import { 
+  CrossmintWalletProvider,
+  useWallet 
+} from '@crossmint/client-sdk-react-native-ui';
+import type { EVMWallet } from '@crossmint/client-sdk-react-native-ui';
+import { View, Text, Button } from 'react-native';
+
+function App() {
+  return (
+    <CrossmintProvider apiKey="YOUR_API_KEY">
+      <CrossmintAuthProvider>
+        <CrossmintWalletProvider
+          createOnLogin={{ chain: 'ethereum' }}
+          callbacks={{
+            onWalletCreationStart: async () => {
+              console.log('Creating wallet...');
+            },
+            onTransactionStart: async () => {
+              console.log('Transaction starting...');
+            },
+          }}
+        >
+          <WalletScreen />
+        </CrossmintWalletProvider>
+      </CrossmintAuthProvider>
+    </CrossmintProvider>
+  );
+}
+
+function WalletScreen() {
+  const { wallet, status } = useWallet<EVMWallet>();
+
+  if (status === 'not-loaded') {
+    return <Text>No wallet</Text>;
+  }
+
+  return (
+    <View>
+      <Text>Address: {wallet.address}</Text>
+      <Text>Chain: {wallet.chain}</Text>
+      <Button
+        title="Get Balance"
+        onPress={async () => {
+          const balance = await wallet.getBalance();
+          console.log('Balance:', balance);
+        }}
+      />
+    </View>
+  );
+}
+```
+
+#### Props
+
+<ParamField path="createOnLogin" type="CreateOnLogin">
+  Automatically create a wallet when user logs in
+  ```tsx
+  createOnLogin={{ chain: 'ethereum' | 'solana' | 'stellar' }}
+  ```
+</ParamField>
+
+<ParamField path="showPasskeyHelpers" type="boolean" default={true}>
+  Show UI helpers for passkey creation and management
+</ParamField>
+
+<ParamField path="appearance" type="UIConfig">
+  Customize wallet UI appearance
+</ParamField>
+
+<ParamField path="callbacks" type="object">
+  Lifecycle callbacks:
+  - `onWalletCreationStart` - Called before wallet creation
+  - `onTransactionStart` - Called before transaction signing
+</ParamField>
+
+### useWallet Hook
+
+Access wallet state and methods:
+
+```tsx
+import { useWallet } from '@crossmint/client-sdk-react-native-ui';
+import type { SolanaWallet } from '@crossmint/client-sdk-react-native-ui';
+import { View, Text, Button } from 'react-native';
+
+function SolanaWalletInfo() {
+  const { wallet, status } = useWallet<SolanaWallet>();
+
+  if (status !== 'loaded') {
+    return <Text>Loading wallet...</Text>;
+  }
+
+  return (
+    <View>
+      <Text>Address: {wallet.address}</Text>
+      <Button
+        title="Sign Message"
+        onPress={async () => {
+          const signature = await wallet.signMessage('Hello Solana!');
+          console.log('Signature:', signature);
+        }}
+      />
+    </View>
+  );
+}
+```
+
+#### Return Values
+
+<ResponseField name="wallet" type="Wallet">
+  Wallet instance (EVMWallet, SolanaWallet, or StellarWallet) with methods:
+  - `address` - Wallet address
+  - `chain` - Blockchain identifier  
+  - `getBalance()` - Fetch wallet balance
+  - `signMessage(message)` - Sign arbitrary message
+  - `sendTransaction(tx)` - Send transaction
+</ResponseField>
+
+<ResponseField name="status" type="'not-loaded' | 'loading' | 'loaded'">
+  Current wallet loading status
+</ResponseField>
+
+### useWalletEmailSigner Hook
+
+Manage email-based transaction signing:
+
+```tsx
+import { useWalletEmailSigner } from '@crossmint/client-sdk-react-native-ui';
+import { View, Button } from 'react-native';
+
+function EmailSignerSettings() {
+  const { requestEmailSigner } = useWalletEmailSigner();
+
+  return (
+    <View>
+      <Button
+        title="Add Email Signer"
+        onPress={async () => {
+          await requestEmailSigner('user@example.com');
+        }}
+      />
+    </View>
+  );
+}
+```
+
+## Checkout Components
+
+### CrossmintEmbeddedCheckout
+
+Embedded checkout WebView for accepting payments:
+
+```tsx
+import { CrossmintEmbeddedCheckout } from '@crossmint/client-sdk-react-native-ui';
+import { View } from 'react-native';
+
+function CheckoutScreen() {
+  return (
+    <View style={{ flex: 1 }}>
+      <CrossmintEmbeddedCheckout
+        lineItems={{
+          collectionLocator: 'crossmint:collection-id',
+          callData: {
+            totalPrice: '0.1',
+            quantity: 1,
+          },
+        }}
+        payment={{
+          crypto: { enabled: true },
+          fiat: { enabled: true },
+        }}
+        recipient={{
+          email: 'user@example.com',
+        }}
+        onEvent={(event) => {
+          console.log('Checkout event:', event);
+          if (event.type === 'order:completed') {
+            // Navigate to success screen
+          }
+        }}
+      />
+    </View>
+  );
+}
+```
+
+#### Props
+
+<ParamField path="lineItems" type="object" required>
+  Items to purchase:
+  ```tsx
+  {
+    collectionLocator: 'crossmint:collection-id',
+    callData: { totalPrice: '0.1', quantity: 1 }
+  }
+  ```
+</ParamField>
+
+<ParamField path="payment" type="object">
+  Payment method configuration:
+  ```tsx
+  {
+    crypto: { enabled: true },
+    fiat: { enabled: true }
+  }
+  ```
+</ParamField>
+
+<ParamField path="recipient" type="object">
+  Recipient details:
+  ```tsx
+  {
+    email: 'user@example.com',
+    wallet: '0x...' // Optional delivery address
+  }
+  ```
+</ParamField>
+
+<ParamField path="locale" type="string">
+  Checkout UI locale (e.g., 'en-US', 'es-ES')
+</ParamField>
+
+<ParamField path="appearance" type="object">
+  Customize checkout appearance
+</ParamField>
+
+<ParamField path="onEvent" type="(event) => void">
+  Callback for checkout events:
+  - `'order:created'` - Order was created
+  - `'order:completed'` - Payment completed successfully
+  - `'order:failed'` - Payment failed
+</ParamField>
+
+### useCrossmintCheckout Hook
+
+Access current checkout order state:
+
+```tsx
+import { useCrossmintCheckout } from '@crossmint/client-sdk-react-native-ui';
+import { View, Text } from 'react-native';
+
+function OrderStatus() {
+  const { order, orderClientSecret } = useCrossmintCheckout();
+
+  if (!order) return null;
+
+  return (
+    <View>
+      <Text>Order ID: {order.id}</Text>
+      <Text>Status: {order.status}</Text>
+      <Text>Total: {order.totalPrice}</Text>
+    </View>
+  );
+}
+```
+
+## Hooks Reference
+
+All hooks exported from `/home/daytona/workspace/source/packages/client/ui/react-native/src/hooks`:
+
+### useCrossmint
+
+```tsx
+import { useCrossmint } from '@crossmint/client-sdk-react-native-ui';
+
+const { crossmint, experimental_customAuth } = useCrossmint();
+```
+
+Provides access to the core Crossmint SDK instance.
+
+### useAuth
+
+Alias for `useCrossmintAuth`.
+
+## Type Exports
+
+Key TypeScript types:
+
+```tsx
+import type {
+  // Provider types
+  CrossmintProviderProps,
+  CrossmintWalletProviderProps,
+  
+  // Auth types
+  SDKExternalUser,
+  OAuthProvider,
+  
+  // Wallet types
+  Wallet,
+  EVMWallet,
+  SolanaWallet,
+  StellarWallet,
+  DelegatedSigner,
+  
+  // Transaction types
+  Transaction,
+  Signature,
+  Activity,
+  Balances,
+  Chain,
+  
+  // Event types
+  CrossmintEvent,
+  CrossmintEventMap,
+} from '@crossmint/client-sdk-react-native-ui';
+```
+
+## Platform-Specific Considerations
+
+### iOS
+
+- OAuth flows open in `SFSafariViewController`
+- Ensure your bundle identifier is configured in `app.json`
+- Handle deep links for OAuth callback
+
+### Android
+
+- OAuth flows use Chrome Custom Tabs
+- Configure package name in `app.json`
+- Add intent filters for OAuth redirect URIs
+
+### WebView Security
+
+The checkout component uses a secure WebView implementation. See:
+- `/home/daytona/workspace/source/packages/client/ui/react-native/src/components/embed/v3/CrossmintEmbeddedCheckoutV3.tsx`
+
+## Example App Structure
+
+```tsx
+import { 
+  CrossmintProvider,
+  CrossmintAuthProvider,
+  CrossmintWalletProvider,
+  useCrossmintAuth,
+  useWallet
+} from '@crossmint/client-sdk-react-native-ui';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+
+const Stack = createNativeStackNavigator();
+
+export default function App() {
+  return (
+    <CrossmintProvider apiKey="YOUR_API_KEY">
+      <CrossmintAuthProvider loginMethods={['email', 'google']}>
+        <CrossmintWalletProvider createOnLogin={{ chain: 'ethereum' }}>
+          <NavigationContainer>
+            <Stack.Navigator>
+              <Stack.Screen name="Home" component={HomeScreen} />
+              <Stack.Screen name="Wallet" component={WalletScreen} />
+              <Stack.Screen name="Checkout" component={CheckoutScreen} />
+            </Stack.Navigator>
+          </NavigationContainer>
+        </CrossmintWalletProvider>
+      </CrossmintAuthProvider>
+    </CrossmintProvider>
+  );
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="React SDK" icon="react" href="/client-sdk/react-ui">
+    Compare with web SDK features
+  </Card>
+  <Card title="Auth SDK" icon="key" href="/client-sdk/auth">
+    Build custom auth flows
+  </Card>
+  <Card title="Expo Documentation" icon="book" href="https://docs.expo.dev">
+    Learn more about Expo
+  </Card>
+  <Card title="Examples" icon="code" href="https://github.com/crossmint/examples">
+    View example apps
+  </Card>
+</CardGroup>

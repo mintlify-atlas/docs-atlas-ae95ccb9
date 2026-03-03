@@ -1,0 +1,138 @@
+---
+title: "Wallets SDK Overview"
+description: "A TypeScript SDK to create and manage smart wallets on Solana, EVM, and Stellar chains"
+---
+
+## What is the Wallets SDK?
+
+The Crossmint Wallets SDK is a TypeScript library that enables developers to easily create and manage custodial and non-custodial smart wallets across multiple blockchain networks including Solana, EVM chains (Ethereum, Polygon, Base, etc.), and Stellar.
+
+## Key Features
+
+- **Multi-chain support**: Create and manage wallets on Solana, EVM chains, and Stellar
+- **Smart wallet functionality**: Built-in support for delegated signers, gasless transactions, and batch operations
+- **Flexible authentication**: Email, phone, passkeys, external wallets, or API key authentication
+- **Simple token operations**: Check balances, send tokens, and manage transactions with minimal code
+- **Chain-specific transactions**: Full support for custom transactions on each blockchain
+- **Activity tracking**: Monitor wallet activity and transaction history
+
+## Supported Chains
+
+<CardGroup cols={3}>
+  <Card title="EVM Chains" icon="ethereum">
+    Ethereum, Polygon, Base, Arbitrum, Optimism, and more
+  </Card>
+  <Card title="Solana" icon="circle">
+    Solana mainnet and devnet
+  </Card>
+  <Card title="Stellar" icon="star">
+    Stellar mainnet and testnet
+  </Card>
+</CardGroup>
+
+## Installation
+
+```bash
+npm install @crossmint/wallets-sdk
+# or
+pnpm install @crossmint/wallets-sdk
+# or
+yarn add @crossmint/wallets-sdk
+```
+
+## Quick Start
+
+Here's a minimal example to get you started:
+
+```typescript
+import { CrossmintWallets, createCrossmint } from "@crossmint/wallets-sdk";
+
+// Initialize the SDK
+const crossmint = createCrossmint({
+    apiKey: "<your-client-OR-server-api-key>",
+    experimental_customAuth: {
+        jwt: "<your-jwt>", // Required for client-side calls
+    },
+});
+
+const crossmintWallets = CrossmintWallets.from(crossmint);
+
+// Create or get a wallet
+const wallet = await crossmintWallets.getOrCreateWallet({
+    chain: "polygon",
+    signer: {
+        type: "email",
+        email: "user@example.com",
+        onAuthRequired: async (needsAuth, sendEmailWithOtp, verifyOtp, reject) => {
+            if (needsAuth) {
+                await sendEmailWithOtp();
+                // Prompt user for OTP and verify
+                // const otp = await promptUserForOtp();
+                // await verifyOtp(otp);
+            }
+        },
+    },
+});
+
+console.log(wallet.address); // Wallet address on chain
+```
+
+## Core Concepts
+
+### Wallet
+
+A `Wallet` object represents a smart wallet on a specific blockchain. It provides methods for:
+- Checking balances
+- Sending tokens
+- Managing delegated signers
+- Viewing activity
+
+### Signer
+
+Signers authenticate and authorize transactions. The SDK supports multiple signer types:
+- **Email**: Email-based authentication with OTP
+- **Phone**: Phone-based authentication with OTP
+- **Passkey**: WebAuthn/FIDO2 passkey authentication (EVM only)
+- **External Wallet**: Connect existing wallets (MetaMask, Phantom, etc.)
+- **API Key**: Server-side authentication
+
+### Chain-Specific Wallets
+
+For advanced operations, cast the base `Wallet` to chain-specific types:
+- `EVMWallet`: EVM-specific operations (signing messages, typed data, custom transactions)
+- `SolanaWallet`: Solana transaction handling
+- `StellarWallet`: Stellar transaction and contract calls
+
+## Common Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Token Transfers" icon="paper-plane" href="/wallets-sdk/wallet-operations#send-tokens">
+    Send USDC, ETH, SOL, or any token to users
+  </Card>
+  <Card title="Check Balances" icon="wallet" href="/wallets-sdk/wallet-operations#get-balances">
+    Query native tokens, USDC, and custom token balances
+  </Card>
+  <Card title="Delegated Signers" icon="users" href="/wallets-sdk/delegated-signers">
+    Add multiple signers to a single wallet
+  </Card>
+  <Card title="Custom Transactions" icon="code" href="/wallets-sdk/evm-wallets#send-custom-transactions">
+    Execute smart contract calls and custom transactions
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Getting Started" icon="rocket" href="/wallets-sdk/getting-started">
+    Set up the SDK and create your first wallet
+  </Card>
+  <Card title="Wallet Operations" icon="list-check" href="/wallets-sdk/wallet-operations">
+    Learn about balances, transfers, and activity tracking
+  </Card>
+  <Card title="EVM Wallets" icon="ethereum" href="/wallets-sdk/evm-wallets">
+    Work with EVM chains and smart contracts
+  </Card>
+  <Card title="Solana Wallets" icon="circle" href="/wallets-sdk/solana-wallets">
+    Build on Solana with custom transactions
+  </Card>
+</CardGroup>

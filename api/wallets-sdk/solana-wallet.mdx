@@ -1,0 +1,291 @@
+---
+title: "SolanaWallet"
+description: "Solana-specific wallet functionality"
+---
+
+The `SolanaWallet` class extends the base `Wallet` class with Solana-specific functionality for sending transactions with the Solana blockchain.
+
+## Creating a Solana Wallet
+
+### from()
+
+Create a SolanaWallet instance from a base Wallet.
+
+```typescript
+static from(wallet: Wallet<Chain>): SolanaWallet
+```
+
+<ParamField path="wallet" type="Wallet<Chain>" required>
+  A wallet instance with a Solana address
+</ParamField>
+
+<ResponseField name="solanaWallet" type="SolanaWallet">
+  A SolanaWallet instance with Solana-specific methods
+</ResponseField>
+
+#### Example
+
+```typescript
+import { SolanaWallet } from "@crossmint/wallets";
+
+const wallet = await wallets.getOrCreateWallet({
+  chain: "solana",
+  signer: {
+    type: "solana-keypair",
+    privateKey: "base58-encoded-key"
+  }
+});
+
+const solanaWallet = SolanaWallet.from(wallet);
+```
+
+## Transaction Methods
+
+### sendTransaction()
+
+Send a raw Solana transaction. Supports two formats: serialized transaction string or VersionedTransaction object.
+
+```typescript
+public async sendTransaction<T extends TransactionInputOptions | undefined = undefined>(
+  params: SolanaTransactionInput
+): Promise<Transaction<T extends PrepareOnly<true> ? true : false>>
+```
+
+<ParamField path="params" type="SolanaTransactionInput" required>
+  Transaction parameters (multiple formats supported)
+  
+  <Expandable title="Format 1: VersionedTransaction">
+    <ParamField path="transaction" type="VersionedTransaction" required>
+      A Solana VersionedTransaction object from @solana/web3.js
+    </ParamField>
+    <ParamField path="additionalSigners" type="Keypair[]">
+      Additional keypairs to sign the transaction (for multi-sig)
+    </ParamField>
+    <ParamField path="options" type="TransactionInputOptions">
+      Transaction options
+      
+      <Expandable title="properties">
+        <ParamField path="experimental_prepareOnly" type="boolean">
+          If true, returns transaction ID without auto-approving
+        </ParamField>
+        <ParamField path="experimental_signer" type="string">
+          Custom signer locator
+        </ParamField>
+      </Expandable>
+    </ParamField>
+  </Expandable>
+  
+  <Expandable title="Format 2: Serialized Transaction">
+    <ParamField path="serializedTransaction" type="string" required>
+      Base58-encoded serialized transaction
+    </ParamField>
+    <ParamField path="additionalSigners" type="Keypair[]">
+      Additional keypairs to sign the transaction
+    </ParamField>
+    <ParamField path="options" type="TransactionInputOptions">
+      Transaction options
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ResponseField name="transaction" type="Transaction">
+  The transaction result
+  
+  <Expandable title="properties">
+    <ResponseField name="hash" type="string">
+      Transaction signature (undefined if prepareOnly)
+    </ResponseField>
+    <ResponseField name="explorerLink" type="string">
+      Solana Explorer link (undefined if prepareOnly)
+    </ResponseField>
+    <ResponseField name="transactionId" type="string">
+      Internal transaction ID
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+#### Examples
+
+```typescript
+import {
+  Connection,
+  Keypair,
+  LAMPORTS_PER_SOL,
+  PublicKey,
+  SystemProgram,
+  TransactionMessage,
+  VersionedTransaction
+} from "@solana/web3.js";
+
+// Example 1: Send SOL transfer using VersionedTransaction
+const connection = new Connection("https://api.mainnet-beta.solana.com");
+
+const recipientPubkey = new PublicKey("7EqQdEUcX...");
+const senderPubkey = new PublicKey(solanaWallet.address);
+
+// Create transfer instruction
+const transferInstruction = SystemProgram.transfer({
+  fromPubkey: senderPubkey,
+  toPubkey: recipientPubkey,
+  lamports: 0.1 * LAMPORTS_PER_SOL // 0.1 SOL
+});
+
+// Get recent blockhash
+const { blockhash } = await connection.getLatestBlockhash();
+
+// Create message
+const message = new TransactionMessage({
+  payerKey: senderPubkey,
+  recentBlockhash: blockhash,
+  instructions: [transferInstruction]
+}).compileToV0Message();
+
+// Create transaction
+const transaction = new VersionedTransaction(message);
+
+// Send transaction
+const result = await solanaWallet.sendTransaction({
+  transaction
+});
+
+console.log("Transaction signature:", result.hash);
+console.log("Explorer:", result.explorerLink);
+
+// Example 2: Send with additional signers (multi-sig)
+const additionalSigner = Keypair.generate();
+
+const result2 = await solanaWallet.sendTransaction({
+  transaction,
+  additionalSigners: [additionalSigner]
+});
+
+// Example 3: Send pre-serialized transaction
+import bs58 from "bs58";
+
+const serializedTx = bs58.encode(transaction.serialize());
+
+const result3 = await solanaWallet.sendTransaction({
+  serializedTransaction: serializedTx
+});
+
+// Example 4: Prepare only (don't auto-approve)
+const result4 = await solanaWallet.sendTransaction({
+  transaction,
+  options: { experimental_prepareOnly: true }
+});
+
+console.log("Transaction ID:", result4.transactionId);
+// Later: await solanaWallet.approve({ transactionId: result4.transactionId });
+
+// Example 5: Send SPL token transfer
+import { getAssociatedTokenAddress, createTransferInstruction } from "@solana/spl-token";
+
+const tokenMint = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"); // USDC
+
+// Get token accounts
+const fromTokenAccount = await getAssociatedTokenAddress(
+  tokenMint,
+  senderPubkey
+);
+const toTokenAccount = await getAssociatedTokenAddress(
+  tokenMint,
+  recipientPubkey
+);
+
+// Create transfer instruction
+const tokenTransferIx = createTransferInstruction(
+  fromTokenAccount,
+  toTokenAccount,
+  senderPubkey,
+  1000000 // 1 USDC (6 decimals)
+);
+
+const tokenMessage = new TransactionMessage({
+  payerKey: senderPubkey,
+  recentBlockhash: blockhash,
+  instructions: [tokenTransferIx]
+}).compileToV0Message();
+
+const tokenTx = new VersionedTransaction(tokenMessage);
+
+const tokenResult = await solanaWallet.sendTransaction({
+  transaction: tokenTx
+});
+
+console.log("Token transfer:", tokenResult.hash);
+```
+
+## Working with Solana Programs
+
+### Calling Program Instructions
+
+You can interact with any Solana program by creating instructions and including them in a transaction.
+
+```typescript
+import { TransactionInstruction } from "@solana/web3.js";
+
+// Example: Custom program instruction
+const customInstruction = new TransactionInstruction({
+  keys: [
+    { pubkey: account1, isSigner: false, isWritable: true },
+    { pubkey: account2, isSigner: false, isWritable: false }
+  ],
+  programId: new PublicKey("YourProgramId..."),
+  data: Buffer.from([1, 2, 3, 4]) // Instruction data
+});
+
+const message = new TransactionMessage({
+  payerKey: new PublicKey(solanaWallet.address),
+  recentBlockhash: (await connection.getLatestBlockhash()).blockhash,
+  instructions: [customInstruction]
+}).compileToV0Message();
+
+const tx = new VersionedTransaction(message);
+
+const result = await solanaWallet.sendTransaction({ transaction: tx });
+```
+
+## Inherited Methods
+
+SolanaWallet inherits all methods from the base [Wallet](/api/wallets-sdk/wallet) class:
+
+- `balances()` - Get token balances (SOL, USDC, and SPL tokens)
+- `send()` - Send tokens (simplified high-level API)
+- `approve()` - Approve transactions
+- `addDelegatedSigner()` - Add delegated signers
+- `delegatedSigners()` - List delegated signers
+- `stagingFund()` - Fund wallet (staging only)
+- All experimental methods
+
+### Using High-Level send() Method
+
+For simple token transfers, you can use the inherited `send()` method:
+
+```typescript
+// Send SOL
+const tx = await solanaWallet.send(
+  "7EqQdEUcX...", // Recipient address
+  "sol", // Token symbol
+  "0.1" // Amount in SOL
+);
+
+// Send USDC
+const tx2 = await solanaWallet.send(
+  "7EqQdEUcX...",
+  "usdc",
+  "10.50" // Amount in USDC
+);
+
+// Send to email
+const tx3 = await solanaWallet.send(
+  { email: "user@example.com" },
+  "usdc",
+  "5.0"
+);
+```
+
+## Related Types
+
+- [CrossmintWallets](/api/wallets-sdk/crossmint-wallets) - SDK initialization
+- [Wallet](/api/wallets-sdk/wallet) - Base wallet class
+- [Types](/api/wallets-sdk/types) - Type definitions

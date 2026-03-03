@@ -1,0 +1,565 @@
+---
+title: Server-Side Authentication
+description: Implement secure server-side authentication with Crossmint using Node.js, Express, and Next.js
+---
+
+# Server-Side Authentication
+
+This guide demonstrates how to implement server-side authentication with Crossmint, including session management, token refresh, and protected routes.
+
+## Demo Repositories
+
+<CardGroup cols={2}>
+  <Card title="Next.js SSR" icon="github" href="https://github.com/Crossmint/crossmint-sdk/tree/main/apps/auth/nextjs-ssr">
+    Complete Next.js server-side auth example
+  </Card>
+  <Card title="Node.js + Express" icon="github" href="https://github.com/Crossmint/crossmint-sdk/tree/main/apps/auth/node-and-express-server">
+    Express server with auth middleware
+  </Card>
+</CardGroup>
+
+## Installation
+
+```bash
+npm install @crossmint/server-sdk
+```
+
+## Environment Variables
+
+```bash
+# Server-side API key (keep this secret!)
+SERVER_CROSSMINT_API_KEY=your_server_api_key
+
+# Optional: Port configuration
+PORT=3001
+```
+
+<Warning>
+  Never expose your server API key in client-side code or commit it to version control.
+</Warning>
+
+## Node.js Implementation
+
+### Basic HTTP Server
+
+Create a basic authentication server with Node.js:
+
+<CodeGroup>
+
+```js index.js
+import { createCrossmint, CrossmintAuth } from "@crossmint/server-sdk";
+import http from "http";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+const crossmint = createCrossmint({
+    apiKey: process.env.SERVER_CROSSMINT_API_KEY || "",
+});
+const crossmintAuth = CrossmintAuth.from(crossmint);
+
+const server = http.createServer(async (req, res) => {
+    // Handle token refresh
+    if (req.method === "POST" && req.url === "/refresh") {
+        try {
+            await crossmintAuth.handleCustomRefresh(req, res);
+        } catch (error) {
+            console.error("Error refreshing token", error);
+        }
+        res.end();
+        return;
+    }
+
+    // Handle logout
+    if (req.method === "POST" && req.url === "/logout") {
+        try {
+            await crossmintAuth.logout(req, res);
+        } catch (error) {
+            console.error("Error logging out", error);
+        }
+        res.end();
+        return;
+    }
+
+    // Protected route - validate session
+    try {
+        const { jwt, refreshToken, userId } = await crossmintAuth.getSession(req, res);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ jwt, refreshToken, userId }));
+    } catch (error) {
+        console.error(error);
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: error.message }));
+    }
+});
+
+const PORT = process.env.PORT || 3001;
+
+server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+});
+```
+
+</CodeGroup>
+
+### Express Server
+
+Implement authentication with Express middleware:
+
+<CodeGroup>
+
+```js express.js
+import { createCrossmint, CrossmintAuth } from "@crossmint/server-sdk";
+import express from "express";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+const app = express();
+
+// Create Crossmint instances
+const crossmint = createCrossmint({
+    apiKey: process.env.SERVER_CROSSMINT_API_KEY || "",
+});
+const crossmintAuth = CrossmintAuth.from(crossmint);
+
+app.use(express.json());
+
+// Token refresh endpoint
+app.post("/refresh", async (req, res) => {
+    try {
+        await crossmintAuth.handleCustomRefresh(req, res);
+    } catch (error) {
+        console.error("Error refreshing token", error);
+    }
+    res.end();
+});
+
+// Logout endpoint
+app.post("/logout", async (req, res) => {
+    try {
+        await crossmintAuth.logout(req, res);
+    } catch (error) {
+        console.error("Error logging out", error);
+    }
+    res.end();
+});
+
+// Authentication middleware
+const authMiddleware = async (req, res, next) => {
+    if (req.method !== "GET") {
+        next();
+        return;
+    }
+
+    try {
+        const { jwt, userId } = await crossmintAuth.getSession(req, res);
+        req.user = { userId, jwt };
+        next();
+    } catch (error) {
+        console.error(error);
+        res.status(401).json({ error: "Authentication failed" });
+    }
+};
+
+app.use(authMiddleware);
+
+// Protected route
+app.get("/protected", (req, res) => {
+    res.json({ message: "Protected route", userId: req.user.userId });
+});
+
+const PORT = process.env.PORT || 3001;
+
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+});
+```
+
+</CodeGroup>
+
+## Next.js Implementation
+
+### API Routes
+
+Implement authentication API routes in Next.js:
+
+<CodeGroup>
+
+```ts app/api/refresh/route.ts
+import { createCrossmint, CrossmintAuth } from "@crossmint/server-sdk";
+import type { NextRequest } from "next/server";
+
+export async function POST(request: NextRequest) {
+    try {
+        const crossmint = createCrossmint({
+            apiKey: process.env.SERVER_CROSSMINT_API_KEY || "",
+        });
+        const crossmintAuth = CrossmintAuth.from(crossmint, {
+            cookieOptions: {
+                httpOnly: true, // Secure cookies
+            },
+        });
+        const response = await crossmintAuth.handleCustomRefresh(request);
+
+        return response as Response;
+    } catch (error) {
+        console.error("Refresh error:", error);
+        return Response.json(
+            { error: "Authentication failed" },
+            { status: 401 }
+        );
+    }
+}
+```
+
+```ts app/api/logout/route.ts
+import { createCrossmint, CrossmintAuth } from "@crossmint/server-sdk";
+import type { NextRequest } from "next/server";
+
+export async function POST(request: NextRequest) {
+    try {
+        const crossmint = createCrossmint({
+            apiKey: process.env.SERVER_CROSSMINT_API_KEY || "",
+        });
+        const crossmintAuth = CrossmintAuth.from(crossmint);
+        const response = await crossmintAuth.logout(request);
+
+        return response as Response;
+    } catch (error) {
+        console.error("Logout error:", error);
+        return Response.json(
+            { error: "Logout failed" },
+            { status: 500 }
+        );
+    }
+}
+```
+
+```ts app/api/protected/route.ts
+import { createCrossmint, CrossmintAuth } from "@crossmint/server-sdk";
+import { cookies } from "next/headers";
+import type { NextRequest } from "next/server";
+
+export async function GET(request: NextRequest) {
+    try {
+        const cookieStore = await cookies();
+        const jwt = cookieStore.get("crossmint-jwt")?.value;
+        const refreshToken = cookieStore.get("crossmint-refresh-token")?.value;
+
+        if (!refreshToken) {
+            return Response.json(
+                { error: "Not authenticated" },
+                { status: 401 }
+            );
+        }
+
+        const crossmint = createCrossmint({
+            apiKey: process.env.SERVER_CROSSMINT_API_KEY || "",
+        });
+        const crossmintAuth = CrossmintAuth.from(crossmint);
+
+        const session = await crossmintAuth.getSession({
+            jwt,
+            refreshToken,
+        });
+
+        return Response.json({
+            message: "Protected data",
+            userId: session.userId,
+        });
+    } catch (error) {
+        console.error("Auth error:", error);
+        return Response.json(
+            { error: "Authentication failed" },
+            { status: 401 }
+        );
+    }
+}
+```
+
+</CodeGroup>
+
+### Server Components
+
+Access auth session in Next.js Server Components:
+
+<CodeGroup>
+
+```ts lib/auth.ts
+import { cookies } from "next/headers";
+import { createCrossmint, CrossmintAuth } from "@crossmint/server-sdk";
+
+export async function getAuthSession(refreshRoute?: string) {
+    const cookieStore = await cookies();
+    const jwt = cookieStore.get("crossmint-jwt")?.value;
+    const refreshToken = cookieStore.get("crossmint-refresh-token")?.value;
+
+    if (!refreshToken) {
+        return null;
+    }
+
+    try {
+        const crossmint = createCrossmint({
+            apiKey: process.env.SERVER_CROSSMINT_API_KEY || "",
+        });
+        const crossmintAuth = CrossmintAuth.from(crossmint, {
+            refreshRoute,
+        });
+
+        const session = await crossmintAuth.getSession({
+            jwt,
+            refreshToken,
+        });
+        return session;
+    } catch (error) {
+        console.error("Session error:", error);
+        return null;
+    }
+}
+
+export async function requireAuth(refreshRoute?: string) {
+    const session = await getAuthSession(refreshRoute);
+    
+    if (!session) {
+        throw new Error("Authentication required");
+    }
+    
+    return session;
+}
+```
+
+```tsx app/dashboard/page.tsx
+import { getAuthSession } from "@/lib/auth";
+import { redirect } from "next/navigation";
+
+export default async function DashboardPage() {
+    const session = await getAuthSession("/api/refresh");
+    
+    if (!session) {
+        redirect("/login");
+    }
+
+    return (
+        <div>
+            <h1>Dashboard</h1>
+            <p>Welcome, user {session.userId}</p>
+        </div>
+    );
+}
+```
+
+</CodeGroup>
+
+### Middleware for Protected Routes
+
+Protect multiple routes with middleware:
+
+<CodeGroup>
+
+```ts middleware.ts
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { createCrossmint, CrossmintAuth } from "@crossmint/server-sdk";
+
+// Configure which routes need authentication
+export const config = {
+    matcher: [
+        "/dashboard/:path*",
+        "/profile/:path*",
+        "/settings/:path*",
+    ],
+};
+
+export async function middleware(request: NextRequest) {
+    const jwt = request.cookies.get("crossmint-jwt")?.value;
+    const refreshToken = request.cookies.get("crossmint-refresh-token")?.value;
+
+    // Redirect to login if no refresh token
+    if (!refreshToken) {
+        return NextResponse.redirect(new URL("/login", request.url));
+    }
+
+    try {
+        const crossmint = createCrossmint({
+            apiKey: process.env.SERVER_CROSSMINT_API_KEY || "",
+        });
+        const crossmintAuth = CrossmintAuth.from(crossmint);
+
+        // Validate and refresh session
+        const { jwt: newJwt, refreshToken: newRefreshToken } = 
+            await crossmintAuth.getSession({
+                jwt,
+                refreshToken,
+            });
+
+        const response = NextResponse.next();
+
+        // Update cookies if tokens changed
+        if (newJwt !== jwt) {
+            response.cookies.set("crossmint-jwt", newJwt);
+        }
+        if (newRefreshToken.secret !== refreshToken) {
+            response.cookies.set("crossmint-refresh-token", newRefreshToken.secret);
+        }
+
+        return response;
+    } catch (error) {
+        console.error("Auth middleware error:", error);
+        
+        // Clear invalid cookies and redirect to login
+        const response = NextResponse.redirect(new URL("/login", request.url));
+        response.cookies.delete("crossmint-jwt");
+        response.cookies.delete("crossmint-refresh-token");
+        
+        return response;
+    }
+}
+```
+
+</CodeGroup>
+
+## Session Management
+
+### Get User Session
+
+<CodeGroup>
+
+```ts
+import { createCrossmint, CrossmintAuth } from "@crossmint/server-sdk";
+
+const crossmint = createCrossmint({
+    apiKey: process.env.SERVER_CROSSMINT_API_KEY,
+});
+const crossmintAuth = CrossmintAuth.from(crossmint);
+
+// From request/response objects
+const session = await crossmintAuth.getSession(req, res);
+console.log(session.userId);
+console.log(session.jwt);
+
+// Or with explicit tokens
+const session = await crossmintAuth.getSession({
+    jwt: "...",
+    refreshToken: "...",
+});
+```
+
+</CodeGroup>
+
+### Handle Token Refresh
+
+<CodeGroup>
+
+```ts
+// Automatic refresh handling
+const crossmintAuth = CrossmintAuth.from(crossmint, {
+    refreshRoute: "/api/refresh",
+});
+
+// The SDK will automatically refresh tokens when they expire
+const session = await crossmintAuth.getSession(req, res);
+```
+
+</CodeGroup>
+
+### Cookie Configuration
+
+<CodeGroup>
+
+```ts
+const crossmintAuth = CrossmintAuth.from(crossmint, {
+    cookieOptions: {
+        httpOnly: true,      // Prevent XSS attacks
+        secure: true,        // HTTPS only
+        sameSite: "strict",  // CSRF protection
+        path: "/",
+        maxAge: 60 * 60 * 24 * 7, // 7 days
+    },
+});
+```
+
+</CodeGroup>
+
+## Security Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use httpOnly Cookies" icon="shield">
+    Always use httpOnly cookies for storing tokens to prevent XSS attacks.
+  </Card>
+  <Card title="Validate Sessions" icon="check">
+    Validate sessions on every protected route or API call.
+  </Card>
+  <Card title="Secure Your API Keys" icon="key">
+    Never expose server API keys in client code or version control.
+  </Card>
+  <Card title="Use HTTPS" icon="lock">
+    Always use HTTPS in production to protect tokens in transit.
+  </Card>
+</CardGroup>
+
+## Error Handling
+
+<CodeGroup>
+
+```ts
+try {
+    const session = await crossmintAuth.getSession(req, res);
+    // Session is valid
+} catch (error) {
+    if (error.code === "SESSION_EXPIRED") {
+        // Token expired, try refresh
+        await crossmintAuth.handleCustomRefresh(req, res);
+    } else if (error.code === "INVALID_TOKEN") {
+        // Invalid token, require re-authentication
+        return res.status(401).json({ error: "Please login again" });
+    } else {
+        // Other error
+        console.error("Auth error:", error);
+        return res.status(500).json({ error: "Authentication failed" });
+    }
+}
+```
+
+</CodeGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Next.js Integration" icon="react" href="/examples/nextjs-integration">
+    Full Next.js authentication setup
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/server/authentication">
+    Server SDK API reference
+  </Card>
+  <Card title="Wallet Creation" icon="wallet" href="/examples/wallet-creation">
+    Add wallets to your auth flow
+  </Card>
+  <Card title="Authentication Guide" icon="book" href="/concepts/authentication">
+    Complete authentication guide
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Session validation failing">
+    - Verify your server API key is correct
+    - Check that cookies are being sent with requests
+    - Ensure the refresh token hasn't expired
+  </Accordion>
+  
+  <Accordion title="CORS issues with cookies">
+    Configure your CORS settings to allow credentials:
+    ```js
+    app.use(cors({
+      origin: 'https://yourdomain.com',
+      credentials: true
+    }));
+    ```
+  </Accordion>
+  
+  <Accordion title="Middleware not running">
+    Check your middleware configuration matcher to ensure it includes the routes you want to protect.
+  </Accordion>
+</AccordionGroup>

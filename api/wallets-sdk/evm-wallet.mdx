@@ -1,0 +1,401 @@
+---
+title: "EVMWallet"
+description: "EVM-specific wallet functionality"
+---
+
+The `EVMWallet` class extends the base `Wallet` class with EVM-specific functionality including raw transactions, message signing, and typed data signing.
+
+## Creating an EVM Wallet
+
+### from()
+
+Create an EVMWallet instance from a base Wallet.
+
+```typescript
+static from(wallet: Wallet<Chain>): EVMWallet
+```
+
+<ParamField path="wallet" type="Wallet<Chain>" required>
+  A wallet instance with an EVM address
+</ParamField>
+
+<ResponseField name="evmWallet" type="EVMWallet">
+  An EVMWallet instance with EVM-specific methods
+</ResponseField>
+
+#### Example
+
+```typescript
+import { EVMWallet } from "@crossmint/wallets";
+
+const wallet = await wallets.getOrCreateWallet({
+  chain: "ethereum",
+  signer: { type: "evm-keypair", privateKey: "0x..." }
+});
+
+const evmWallet = EVMWallet.from(wallet);
+```
+
+## Transaction Methods
+
+### sendTransaction()
+
+Send a raw EVM transaction. Supports three formats: raw transaction, ABI call, or encoded data.
+
+```typescript
+public async sendTransaction<T extends EVMTransactionInput>(
+  params: T
+): Promise<Transaction<T["options"] extends PrepareOnly<true> ? true : false>>
+```
+
+<ParamField path="params" type="EVMTransactionInput" required>
+  Transaction parameters (multiple formats supported)
+  
+  <Expandable title="Format 1: ABI Call">
+    <ParamField path="to" type="string" required>
+      Contract address
+    </ParamField>
+    <ParamField path="abi" type="Abi" required>
+      Contract ABI
+    </ParamField>
+    <ParamField path="functionName" type="string" required>
+      Function name to call
+    </ParamField>
+    <ParamField path="args" type="unknown[]">
+      Function arguments
+    </ParamField>
+    <ParamField path="value" type="bigint">
+      ETH value to send (in wei)
+    </ParamField>
+    <ParamField path="options" type="TransactionInputOptions">
+      Transaction options
+    </ParamField>
+  </Expandable>
+  
+  <Expandable title="Format 2: Encoded Data">
+    <ParamField path="to" type="string" required>
+      Recipient address
+    </ParamField>
+    <ParamField path="data" type="0x${string}">
+      Encoded transaction data
+    </ParamField>
+    <ParamField path="value" type="bigint">
+      ETH value to send (in wei)
+    </ParamField>
+    <ParamField path="options" type="TransactionInputOptions">
+      Transaction options
+    </ParamField>
+  </Expandable>
+  
+  <Expandable title="Format 3: Raw Transaction">
+    <ParamField path="transaction" type="string" required>
+      Fully encoded raw transaction
+    </ParamField>
+    <ParamField path="options" type="TransactionInputOptions">
+      Transaction options
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ResponseField name="transaction" type="Transaction">
+  The transaction result
+  
+  <Expandable title="properties">
+    <ResponseField name="hash" type="string">
+      Transaction hash (undefined if prepareOnly)
+    </ResponseField>
+    <ResponseField name="explorerLink" type="string">
+      Block explorer link (undefined if prepareOnly)
+    </ResponseField>
+    <ResponseField name="transactionId" type="string">
+      Internal transaction ID
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+#### Examples
+
+```typescript
+import { parseEther } from "viem";
+
+// Example 1: Send native ETH
+const tx1 = await evmWallet.sendTransaction({
+  to: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+  value: parseEther("0.1"),
+  data: "0x"
+});
+
+console.log("Transaction:", tx1.hash);
+
+// Example 2: Call contract function with ABI
+const erc20Abi = [
+  {
+    name: "transfer",
+    type: "function",
+    inputs: [
+      { name: "to", type: "address" },
+      { name: "amount", type: "uint256" }
+    ],
+    outputs: [{ name: "success", type: "bool" }]
+  }
+];
+
+const tx2 = await evmWallet.sendTransaction({
+  to: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", // USDC contract
+  abi: erc20Abi,
+  functionName: "transfer",
+  args: [
+    "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+    BigInt(1000000) // 1 USDC (6 decimals)
+  ]
+});
+
+// Example 3: Send with encoded data
+const tx3 = await evmWallet.sendTransaction({
+  to: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+  data: "0xa9059cbb...", // Pre-encoded function call
+  value: 0n
+});
+
+// Example 4: Prepare only (don't auto-approve)
+const tx4 = await evmWallet.sendTransaction({
+  to: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+  value: parseEther("0.1"),
+  data: "0x",
+  options: { experimental_prepareOnly: true }
+});
+
+console.log("Transaction ID:", tx4.transactionId);
+// Later: await evmWallet.approve({ transactionId: tx4.transactionId });
+```
+
+## Signing Methods
+
+### signMessage()
+
+Sign a message with the wallet's private key (EIP-191 personal sign).
+
+```typescript
+public async signMessage<T extends SignMessageInput>(
+  params: T
+): Promise<Signature<T["options"] extends PrepareOnly<true> ? true : false>>
+```
+
+<ParamField path="params" type="SignMessageInput" required>
+  <Expandable title="properties">
+    <ParamField path="message" type="string" required>
+      The message to sign
+    </ParamField>
+    <ParamField path="options" type="SignatureInputOptions">
+      Signature options
+      
+      <Expandable title="properties">
+        <ParamField path="experimental_prepareOnly" type="boolean">
+          If true, returns signature ID without auto-approving
+        </ParamField>
+      </Expandable>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ResponseField name="signature" type="Signature">
+  The signature result
+  
+  <Expandable title="properties">
+    <ResponseField name="signature" type="string">
+      The signature (undefined if prepareOnly)
+    </ResponseField>
+    <ResponseField name="signatureId" type="string">
+      Internal signature ID
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+#### Example
+
+```typescript
+// Sign a message
+const sig = await evmWallet.signMessage({
+  message: "Hello, Web3!"
+});
+
+console.log("Signature:", sig.signature);
+console.log("Signature ID:", sig.signatureId);
+
+// Prepare only (don't auto-approve)
+const sig2 = await evmWallet.signMessage({
+  message: "Hello, Web3!",
+  options: { experimental_prepareOnly: true }
+});
+
+console.log("Signature ID:", sig2.signatureId);
+// Later: await evmWallet.approve({ signatureId: sig2.signatureId });
+```
+
+### signTypedData()
+
+Sign EIP-712 typed data for structured data signing.
+
+```typescript
+public async signTypedData<T extends SignTypedDataInput>(
+  params: T
+): Promise<Signature<T["options"] extends PrepareOnly<true> ? true : false>>
+```
+
+<ParamField path="params" type="SignTypedDataInput" required>
+  <Expandable title="properties">
+    <ParamField path="domain" type="TypedDataDomain" required>
+      EIP-712 domain
+      
+      <Expandable title="properties">
+        <ParamField path="name" type="string" required>
+          Domain name
+        </ParamField>
+        <ParamField path="version" type="string" required>
+          Domain version
+        </ParamField>
+        <ParamField path="chainId" type="number" required>
+          Chain ID
+        </ParamField>
+        <ParamField path="verifyingContract" type="string" required>
+          Verifying contract address
+        </ParamField>
+        <ParamField path="salt" type="string">
+          Optional salt
+        </ParamField>
+      </Expandable>
+    </ParamField>
+    
+    <ParamField path="types" type="Record<string, Array<{ name: string; type: string }>>" required>
+      Type definitions
+    </ParamField>
+    
+    <ParamField path="primaryType" type="string" required>
+      Primary type name
+    </ParamField>
+    
+    <ParamField path="message" type="Record<string, any>" required>
+      The message to sign
+    </ParamField>
+    
+    <ParamField path="chain" type="EVMSmartWalletChain" required>
+      The EVM chain
+    </ParamField>
+    
+    <ParamField path="options" type="SignatureInputOptions">
+      Signature options
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ResponseField name="signature" type="Signature">
+  The signature result
+</ResponseField>
+
+#### Example
+
+```typescript
+// EIP-712 typed data example
+const signature = await evmWallet.signTypedData({
+  domain: {
+    name: "MyDapp",
+    version: "1",
+    chainId: 1,
+    verifyingContract: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
+  },
+  types: {
+    Person: [
+      { name: "name", type: "string" },
+      { name: "wallet", type: "address" }
+    ],
+    Mail: [
+      { name: "from", type: "Person" },
+      { name: "to", type: "Person" },
+      { name: "contents", type: "string" }
+    ]
+  },
+  primaryType: "Mail",
+  message: {
+    from: {
+      name: "Alice",
+      wallet: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
+    },
+    to: {
+      name: "Bob",
+      wallet: "0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199"
+    },
+    contents: "Hello, Bob!"
+  },
+  chain: "ethereum"
+});
+
+console.log("Typed data signature:", signature.signature);
+```
+
+## Utilities
+
+### getViemClient()
+
+Get a Viem public client instance configured for this wallet's chain.
+
+```typescript
+public getViemClient(params?: {
+  transport?: HttpTransport;
+}): PublicClient
+```
+
+<ParamField path="params" type="object">
+  <Expandable title="properties">
+    <ParamField path="transport" type="HttpTransport">
+      Optional custom transport (defaults to http())
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ResponseField name="client" type="PublicClient">
+  A Viem public client for reading blockchain data
+</ResponseField>
+
+#### Example
+
+```typescript
+import { http } from "viem";
+
+// Get default client
+const client = evmWallet.getViemClient();
+
+// Get block number
+const blockNumber = await client.getBlockNumber();
+console.log("Block number:", blockNumber);
+
+// With custom transport
+const customClient = evmWallet.getViemClient({
+  transport: http("https://eth-mainnet.alchemyapi.io/v2/your-api-key")
+});
+
+// Read contract
+const balance = await customClient.readContract({
+  address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+  abi: erc20Abi,
+  functionName: "balanceOf",
+  args: [evmWallet.address]
+});
+```
+
+## Inherited Methods
+
+EVMWallet inherits all methods from the base [Wallet](/api/wallets-sdk/wallet) class:
+
+- `balances()` - Get token balances
+- `send()` - Send tokens
+- `approve()` - Approve transactions/signatures
+- `addDelegatedSigner()` - Add delegated signers
+- `delegatedSigners()` - List delegated signers
+- `stagingFund()` - Fund wallet (staging only)
+- All experimental methods
+
+## Related Types
+
+- [CrossmintWallets](/api/wallets-sdk/crossmint-wallets) - SDK initialization
+- [Wallet](/api/wallets-sdk/wallet) - Base wallet class
+- [Types](/api/wallets-sdk/types) - Type definitions

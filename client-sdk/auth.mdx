@@ -1,0 +1,573 @@
+---
+title: "Auth SDK"
+description: "Headless authentication SDK for building custom auth flows"
+---
+
+## Installation
+
+```bash
+npm install @crossmint/client-sdk-auth
+```
+
+## Overview
+
+The Auth SDK provides a headless authentication client for building custom authentication experiences without pre-built UI components. It supports multiple authentication methods and handles token refresh automatically.
+
+## Quick Start
+
+```typescript
+import { createCrossmint, CrossmintAuth } from '@crossmint/client-sdk-auth';
+
+// Initialize Crossmint
+const crossmint = createCrossmint({ apiKey: 'YOUR_API_KEY' });
+
+// Create auth client
+const auth = CrossmintAuth.from(crossmint, {
+  callbacks: {
+    onTokenRefresh: (authMaterial) => {
+      console.log('Token refreshed:', authMaterial);
+    },
+    onLogout: () => {
+      console.log('User logged out');
+    },
+  },
+});
+
+// Get current user
+const user = await auth.getUser();
+```
+
+## Configuration
+
+### CrossmintAuthClient.from()
+
+Create an authentication client instance:
+
+```typescript
+const auth = CrossmintAuth.from(crossmint, {
+  callbacks: {
+    onTokenRefresh: (authMaterial) => {
+      // Called when JWT is refreshed
+      console.log('New JWT:', authMaterial.jwt);
+    },
+    onLogout: () => {
+      // Called when user logs out
+      console.log('User logged out');
+    },
+  },
+  logoutRoute: '/api/auth/logout', // Optional custom logout endpoint
+  refreshRoute: '/api/auth/refresh', // Optional custom refresh endpoint
+  storageProvider: customStorage, // Optional custom storage provider
+});
+```
+
+#### Config Options
+
+<ParamField path="callbacks" type="object">
+  Lifecycle callbacks:
+  - `onTokenRefresh(authMaterial)` - Called when JWT is refreshed
+  - `onLogout()` - Called when user logs out
+</ParamField>
+
+<ParamField path="logoutRoute" type="string">
+  Custom logout endpoint URL. If not provided, uses default Crossmint logout.
+</ParamField>
+
+<ParamField path="refreshRoute" type="string">
+  Custom token refresh endpoint URL. If not provided, uses default Crossmint refresh.
+</ParamField>
+
+<ParamField path="storageProvider" type="StorageProvider">
+  Custom storage provider for tokens. Defaults to browser localStorage.
+  
+  ```typescript
+  interface StorageProvider {
+    get(key: string): Promise<string | null>;
+    set(key: string, value: string, expiresAt: string): Promise<void>;
+    remove(key: string): Promise<void>;
+  }
+  ```
+</ParamField>
+
+## Authentication Methods
+
+### Email OTP
+
+Authenticate users with email one-time passwords:
+
+```typescript
+// 1. Send OTP to user's email
+const { emailId } = await auth.sendEmailOtp('user@example.com');
+
+// 2. User enters OTP from email
+const otpCode = '123456'; // From user input
+
+// 3. Confirm OTP and get one-time secret
+const oneTimeSecret = await auth.confirmEmailOtp(
+  'user@example.com',
+  emailId,
+  otpCode
+);
+
+// 4. Exchange secret for auth material
+const authMaterial = await auth.handleOneTimeSecret(oneTimeSecret);
+```
+
+See implementation at `/home/daytona/workspace/source/packages/client/auth/src/CrossmintAuthClient.ts:197-243`
+
+### OAuth Providers
+
+Authenticate with OAuth providers (Google, Twitter, Farcaster):
+
+```typescript
+// 1. Get OAuth URL for provider
+const oauthUrl = await auth.getOAuthUrl('google');
+
+// 2. Redirect user to OAuth URL
+window.location.href = oauthUrl;
+
+// 3. Handle callback after OAuth completes
+// The callback URL will contain a one-time secret
+const urlParams = new URLSearchParams(window.location.search);
+const oneTimeSecret = urlParams.get('oneTimeSecret');
+
+// 4. Exchange secret for auth material
+if (oneTimeSecret) {
+  const authMaterial = await auth.handleOneTimeSecret(oneTimeSecret);
+}
+```
+
+#### Supported Providers
+
+<ParamField path="provider" type="OAuthProvider">
+  OAuth provider identifier:
+  - `'google'` - Google OAuth
+  - `'twitter'` - Twitter OAuth
+  - `'farcaster'` - Farcaster authentication
+</ParamField>
+
+<ParamField path="options" type="object">
+  Optional OAuth configuration:
+  ```typescript
+  {
+    appSchema: 'myapp://' // For mobile deep linking
+  }
+  ```
+</ParamField>
+
+See implementation at `/home/daytona/workspace/source/packages/client/auth/src/CrossmintAuthClient.ts:158-195`
+
+### Farcaster
+
+Authenticate with Farcaster Sign In With Farcaster:
+
+```typescript
+import type { UseSignInData } from '@farcaster/auth-kit';
+
+// 1. Get Farcaster sign-in data from @farcaster/auth-kit
+const farcasterData: UseSignInData = {
+  message: 'Sign in with Farcaster',
+  signature: '0x...',
+  fid: 12345,
+  signatureParams: {
+    domain: 'example.com',
+    // ... other params
+  },
+};
+
+// 2. Sign in with Farcaster
+const oneTimeSecret = await auth.signInWithFarcaster(farcasterData);
+
+// 3. Exchange secret for auth material
+const authMaterial = await auth.handleOneTimeSecret(oneTimeSecret);
+```
+
+See implementation at `/home/daytona/workspace/source/packages/client/auth/src/CrossmintAuthClient.ts:245-273`
+
+### Smart Wallet
+
+Authenticate with EVM or Solana smart wallets:
+
+```typescript
+// 1. Initiate smart wallet sign in
+const { message } = await auth.signInWithSmartWallet(
+  '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb',
+  'evm' // or 'solana'
+);
+
+// 2. Sign the message with the wallet
+const signature = await wallet.signMessage(message);
+
+// 3. Authenticate with signature
+const { oneTimeSecret } = await auth.authenticateSmartWallet(
+  '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb',
+  'evm',
+  signature
+);
+
+// 4. Exchange secret for auth material
+const authMaterial = await auth.handleOneTimeSecret(oneTimeSecret);
+```
+
+See implementation at `/home/daytona/workspace/source/packages/client/auth/src/CrossmintAuthClient.ts:275-320`
+
+## User Management
+
+### Get Current User
+
+```typescript
+const user = await auth.getUser();
+
+console.log(user);
+// {
+//   userId: 'usr_...',
+//   email: 'user@example.com',
+//   linkedAccounts: [
+//     { type: 'email', identifier: 'user@example.com' },
+//     { type: 'google', identifier: 'user@example.com' },
+//   ]
+// }
+```
+
+See implementation at `/home/daytona/workspace/source/packages/client/auth/src/CrossmintAuthClient.ts:65-81`
+
+### Logout
+
+```typescript
+await auth.logout();
+// Clears stored tokens and triggers onLogout callback
+```
+
+See implementation at `/home/daytona/workspace/source/packages/client/auth/src/CrossmintAuthClient.ts:99-120`
+
+## Token Management
+
+### Store Auth Material
+
+Manually store authentication material:
+
+```typescript
+const authMaterial = {
+  jwt: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+  refreshToken: {
+    secret: 'rt_...',
+    expiresAt: '2024-12-31T23:59:59Z',
+  },
+  user: {
+    userId: 'usr_...',
+    email: 'user@example.com',
+  },
+};
+
+await auth.storeAuthMaterial(authMaterial);
+```
+
+See implementation at `/home/daytona/workspace/source/packages/client/auth/src/CrossmintAuthClient.ts:83-97`
+
+### Handle Token Refresh
+
+Manually trigger token refresh:
+
+```typescript
+const authMaterial = await auth.handleRefreshAuthMaterial();
+
+if (authMaterial) {
+  console.log('Token refreshed:', authMaterial.jwt);
+} else {
+  console.log('Session expired, user logged out');
+}
+```
+
+<Note>
+  Token refresh happens automatically before expiration. Manual refresh is rarely needed.
+</Note>
+
+See implementation at `/home/daytona/workspace/source/packages/client/auth/src/CrossmintAuthClient.ts:122-156`
+
+## Custom Storage Provider
+
+Implement a custom storage provider for tokens:
+
+```typescript
+import type { StorageProvider } from '@crossmint/client-sdk-auth';
+
+class CustomStorage implements StorageProvider {
+  async get(key: string): Promise<string | null> {
+    // Implement custom get logic
+    return await AsyncStorage.getItem(key);
+  }
+
+  async set(key: string, value: string, expiresAt: string): Promise<void> {
+    // Implement custom set logic
+    await AsyncStorage.setItem(key, value);
+    await AsyncStorage.setItem(`${key}_expires`, expiresAt);
+  }
+
+  async remove(key: string): Promise<void> {
+    // Implement custom remove logic
+    await AsyncStorage.removeItem(key);
+    await AsyncStorage.removeItem(`${key}_expires`);
+  }
+}
+
+const auth = CrossmintAuth.from(crossmint, {
+  storageProvider: new CustomStorage(),
+});
+```
+
+## Server-Side Integration
+
+### Custom Refresh Endpoint
+
+Use a custom server endpoint for token refresh:
+
+```typescript
+// Client-side
+const auth = CrossmintAuth.from(crossmint, {
+  refreshRoute: '/api/auth/refresh',
+});
+```
+
+```typescript
+// Server-side (Next.js API route example)
+import { NextApiRequest, NextApiResponse } from 'next';
+import { CrossmintAuth } from '@crossmint/common-sdk-auth';
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  const refreshToken = req.cookies.refreshToken;
+  
+  if (!refreshToken) {
+    return res.status(401).json({ error: 'No refresh token' });
+  }
+
+  try {
+    const crossmint = createCrossmint({ apiKey: process.env.CROSSMINT_API_KEY });
+    const auth = CrossmintAuth.from(crossmint);
+    
+    const authMaterial = await auth.refreshAuthMaterial(refreshToken);
+    
+    // Store new tokens in cookies
+    res.setHeader('Set-Cookie', [
+      `jwt=${authMaterial.jwt}; HttpOnly; Secure; SameSite=Strict`,
+      `refreshToken=${authMaterial.refreshToken.secret}; HttpOnly; Secure; SameSite=Strict`,
+    ]);
+    
+    res.json({ success: true });
+  } catch (error) {
+    res.status(401).json({ error: 'Refresh failed' });
+  }
+}
+```
+
+### Custom Logout Endpoint
+
+```typescript
+// Client-side
+const auth = CrossmintAuth.from(crossmint, {
+  logoutRoute: '/api/auth/logout',
+});
+```
+
+```typescript
+// Server-side (Next.js API route example)
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  // Clear cookies
+  res.setHeader('Set-Cookie', [
+    'jwt=; HttpOnly; Secure; SameSite=Strict; Max-Age=0',
+    'refreshToken=; HttpOnly; Secure; SameSite=Strict; Max-Age=0',
+  ]);
+  
+  res.json({ success: true });
+}
+```
+
+## Type Definitions
+
+```typescript
+import type {
+  // Client types
+  CrossmintAuthClient,
+  CrossmintAuthClientConfig,
+  
+  // Auth material
+  AuthMaterialWithUser,
+  
+  // OAuth types
+  OAuthProvider,
+  
+  // Storage types
+  StorageProvider,
+  
+  // Utility functions
+  getJWTExpiration,
+} from '@crossmint/client-sdk-auth';
+```
+
+## Error Handling
+
+```typescript
+import { CrossmintAuthenticationError } from '@crossmint/common-sdk-auth';
+
+try {
+  await auth.sendEmailOtp('invalid-email');
+} catch (error) {
+  if (error instanceof CrossmintAuthenticationError) {
+    console.error('Auth error:', error.message);
+  }
+}
+```
+
+## Best Practices
+
+<Accordion title="Secure Token Storage">
+  Use `HttpOnly` cookies for production apps to prevent XSS attacks:
+  
+  ```typescript
+  const auth = CrossmintAuth.from(crossmint, {
+    refreshRoute: '/api/auth/refresh',
+    logoutRoute: '/api/auth/logout',
+  });
+  ```
+  
+  This delegates token storage to your server where cookies can be properly secured.
+</Accordion>
+
+<Accordion title="Handle Token Refresh">
+  The SDK handles token refresh automatically. Listen to the callback:
+  
+  ```typescript
+  const auth = CrossmintAuth.from(crossmint, {
+    callbacks: {
+      onTokenRefresh: (authMaterial) => {
+        // Update UI or trigger re-fetch of protected data
+        console.log('Token refreshed');
+      },
+    },
+  });
+  ```
+</Accordion>
+
+<Accordion title="Error Recovery">
+  Handle authentication errors gracefully:
+  
+  ```typescript
+  try {
+    const user = await auth.getUser();
+  } catch (error) {
+    if (error instanceof CrossmintAuthenticationError) {
+      // Redirect to login
+      window.location.href = '/login';
+    }
+  }
+  ```
+</Accordion>
+
+## Framework Examples
+
+<Tabs>
+  <Tab title="Next.js">
+    ```typescript
+    // lib/auth.ts
+    import { createCrossmint, CrossmintAuth } from '@crossmint/client-sdk-auth';
+
+    const crossmint = createCrossmint({ 
+      apiKey: process.env.NEXT_PUBLIC_CROSSMINT_API_KEY! 
+    });
+
+    export const auth = CrossmintAuth.from(crossmint, {
+      refreshRoute: '/api/auth/refresh',
+      logoutRoute: '/api/auth/logout',
+    });
+    ```
+
+    ```typescript
+    // pages/login.tsx
+    import { auth } from '@/lib/auth';
+
+    export default function LoginPage() {
+      const handleLogin = async (email: string, otp: string) => {
+        const { emailId } = await auth.sendEmailOtp(email);
+        const secret = await auth.confirmEmailOtp(email, emailId, otp);
+        await auth.handleOneTimeSecret(secret);
+        router.push('/dashboard');
+      };
+
+      return <LoginForm onSubmit={handleLogin} />;
+    }
+    ```
+  </Tab>
+  <Tab title="React SPA">
+    ```typescript
+    // hooks/useAuth.ts
+    import { useState, useEffect } from 'react';
+    import { createCrossmint, CrossmintAuth } from '@crossmint/client-sdk-auth';
+
+    const crossmint = createCrossmint({ apiKey: import.meta.env.VITE_API_KEY });
+    const auth = CrossmintAuth.from(crossmint);
+
+    export function useAuth() {
+      const [user, setUser] = useState(null);
+
+      useEffect(() => {
+        auth.getUser().then(setUser).catch(() => setUser(null));
+      }, []);
+
+      return {
+        user,
+        login: async (email: string) => {
+          const { emailId } = await auth.sendEmailOtp(email);
+          return emailId;
+        },
+        logout: () => auth.logout(),
+      };
+    }
+    ```
+  </Tab>
+  <Tab title="Node.js">
+    ```typescript
+    // server.ts
+    import express from 'express';
+    import { createCrossmint, CrossmintAuth } from '@crossmint/client-sdk-auth';
+
+    const app = express();
+    const crossmint = createCrossmint({ apiKey: process.env.CROSSMINT_API_KEY });
+    const auth = CrossmintAuth.from(crossmint);
+
+    app.post('/auth/email', async (req, res) => {
+      const { email } = req.body;
+      const { emailId } = await auth.sendEmailOtp(email);
+      res.json({ emailId });
+    });
+
+    app.post('/auth/verify', async (req, res) => {
+      const { email, emailId, otp } = req.body;
+      const secret = await auth.confirmEmailOtp(email, emailId, otp);
+      const authMaterial = await auth.handleOneTimeSecret(secret);
+      res.json({ jwt: authMaterial.jwt });
+    });
+    ```
+  </Tab>
+</Tabs>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="React UI SDK" icon="react" href="/client-sdk/react-ui">
+    Use pre-built auth components
+  </Card>
+  <Card title="React Native SDK" icon="mobile" href="/client-sdk/react-native-ui">
+    Build mobile auth flows
+  </Card>
+  <Card title="API Reference" icon="book" href="/api/client-sdk/crossmint-auth">
+    Explore authentication APIs
+  </Card>
+  <Card title="Security Guide" icon="shield" href="/server-sdk/authentication">
+    Learn about security best practices
+  </Card>
+</CardGroup>

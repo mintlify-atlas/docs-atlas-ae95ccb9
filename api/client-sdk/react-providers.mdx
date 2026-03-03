@@ -1,0 +1,501 @@
+---
+title: React Providers
+description: Context providers for authentication, wallet management, and SDK configuration
+---
+
+## Overview
+
+Crossmint React Providers wrap your application to provide authentication state, wallet functionality, and SDK configuration to all child components.
+
+## Installation
+
+```bash
+npm install @crossmint/client-sdk-react-ui
+```
+
+## CrossmintProvider
+
+Root provider that initializes the Crossmint SDK. Required for all other Crossmint components and hooks.
+
+### Usage
+
+```tsx
+import { CrossmintProvider } from '@crossmint/client-sdk-react-ui';
+
+function App() {
+  return (
+    <CrossmintProvider apiKey="your-api-key">
+      {/* Your app */}
+    </CrossmintProvider>
+  );
+}
+```
+
+### Props
+
+<ParamField path="apiKey" type="string" required>
+  Your Crossmint API key from the [Developer Console](https://www.crossmint.com/console)
+</ParamField>
+
+<ParamField path="consoleLogLevel" type="ConsoleLogLevel" optional default="debug">
+  Minimum log level for console output
+  
+  <Expandable title="ConsoleLogLevel type">
+    ```typescript
+    type ConsoleLogLevel = 'debug' | 'info' | 'warn' | 'error' | 'silent'
+    ```
+  </Expandable>
+  
+  **Example:**
+  ```tsx
+  // Suppress all console logs
+  <CrossmintProvider apiKey="..." consoleLogLevel="silent" />
+  
+  // Show only warnings and errors
+  <CrossmintProvider apiKey="..." consoleLogLevel="warn" />
+  ```
+</ParamField>
+
+<ParamField path="children" type="ReactNode" required>
+  Your application components
+</ParamField>
+
+### Context Value
+
+Provides access via `useCrossmint()` hook:
+
+```tsx
+import { useCrossmint } from '@crossmint/client-sdk-react-ui';
+
+function MyComponent() {
+  const { crossmint } = useCrossmint();
+  console.log(crossmint.apiKey);
+}
+```
+
+---
+
+## CrossmintAuthProvider
+
+Provides authentication state and UI. Must be nested inside `CrossmintProvider`.
+
+### Usage
+
+```tsx
+import { 
+  CrossmintProvider, 
+  CrossmintAuthProvider 
+} from '@crossmint/client-sdk-react-ui';
+
+function App() {
+  return (
+    <CrossmintProvider apiKey="your-api-key">
+      <CrossmintAuthProvider
+        loginMethods={['email', 'google', 'farcaster']}
+        appearance={{
+          colors: {
+            accent: '#4F46E5',
+            textPrimary: '#000000'
+          }
+        }}
+        onLoginSuccess={() => console.log('Login successful!')}
+      >
+        {/* Your app */}
+      </CrossmintAuthProvider>
+    </CrossmintProvider>
+  );
+}
+```
+
+### Props
+
+<ParamField path="loginMethods" type="LoginMethod[]" optional default="['email', 'google']">
+  Authentication methods to enable
+  
+  <Expandable title="LoginMethod type">
+    ```typescript
+    type LoginMethod = 
+      | 'email'                  // Email OTP
+      | 'google'                 // Google OAuth
+      | 'twitter'                // Twitter OAuth
+      | 'farcaster'              // Farcaster
+      | 'web3-injected'          // Browser wallet (MetaMask, etc.)
+      | 'web3-walletconnect'     // WalletConnect
+      | 'web3-coinbase'          // Coinbase Wallet
+    ```
+  </Expandable>
+  
+  **Example:**
+  ```tsx
+  loginMethods={['email', 'google', 'web3-injected']}
+  ```
+</ParamField>
+
+<ParamField path="appearance" type="UIConfig" optional>
+  Customize authentication UI appearance
+  
+  <Expandable title="UIConfig properties">
+    <ParamField path="colors" type="object" optional>
+      <Expandable title="properties">
+        <ParamField path="accent" type="string" optional>
+          Primary accent color (buttons, links)
+        </ParamField>
+        <ParamField path="textPrimary" type="string" optional>
+          Primary text color
+        </ParamField>
+        <ParamField path="textSecondary" type="string" optional>
+          Secondary text color
+        </ParamField>
+        <ParamField path="textLink" type="string" optional>
+          Link color
+        </ParamField>
+        <ParamField path="danger" type="string" optional>
+          Error/danger color
+        </ParamField>
+        <ParamField path="background" type="string" optional>
+          Background color
+        </ParamField>
+      </Expandable>
+    </ParamField>
+    
+    <ParamField path="fontFamily" type="string" optional>
+      Font family for all text
+      
+      **Example:** `"'Inter', sans-serif"`
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="authModalTitle" type="string" optional default="Sign in to Crossmint">
+  Title displayed in the authentication modal
+</ParamField>
+
+<ParamField path="termsOfServiceText" type="string | ReactNode" optional>
+  Terms of service text displayed at the bottom of the auth form. Supports HTML/JSX.
+  
+  **Example:**
+  ```tsx
+  termsOfServiceText={
+    <p>
+      By signing in, you agree to our{' '}
+      <a href="https://example.com/terms">Terms of Service</a> and{' '}
+      <a href="https://example.com/privacy">Privacy Policy</a>
+    </p>
+  }
+  ```
+</ParamField>
+
+<ParamField path="prefetchOAuthUrls" type="boolean" optional default={true}>
+  Prefetch OAuth URLs for faster login. Set to `false` to reduce initial load.
+</ParamField>
+
+<ParamField path="onLoginSuccess" type="() => void" optional>
+  Callback invoked after successful login
+  
+  **Example:**
+  ```tsx
+  onLoginSuccess={() => {
+    router.push('/dashboard');
+    toast.success('Welcome back!');
+  }}
+  ```
+</ParamField>
+
+<ParamField path="refreshRoute" type="string" optional>
+  Custom server endpoint for refreshing authentication tokens. Required for server-side cookie management.
+  
+  **Example (Next.js):**
+  ```tsx
+  refreshRoute="/api/auth/refresh"
+  ```
+</ParamField>
+
+<ParamField path="logoutRoute" type="string" optional>
+  Custom server endpoint for handling logout. Required for server-side cookie management.
+  
+  **Example (Next.js):**
+  ```tsx
+  logoutRoute="/api/auth/logout"
+  ```
+</ParamField>
+
+<ParamField path="children" type="ReactNode" required>
+  Your application components
+</ParamField>
+
+### Context Value
+
+Provides access via `useCrossmintAuth()` hook:
+
+```tsx
+import { useCrossmintAuth } from '@crossmint/client-sdk-react-ui';
+
+function MyComponent() {
+  const { user, jwt, status, login, logout } = useCrossmintAuth();
+  
+  if (status === 'logged-out') {
+    return <button onClick={() => login()}>Sign In</button>;
+  }
+  
+  return <p>Welcome, {user?.email}</p>;
+}
+```
+
+---
+
+## CrossmintWalletProvider
+
+Provides smart wallet functionality including creation, transactions, and signer management. Must be nested inside `CrossmintAuthProvider`.
+
+### Usage
+
+```tsx
+import { 
+  CrossmintProvider, 
+  CrossmintAuthProvider,
+  CrossmintWalletProvider 
+} from '@crossmint/client-sdk-react-ui';
+
+function App() {
+  return (
+    <CrossmintProvider apiKey="your-api-key">
+      <CrossmintAuthProvider loginMethods={['email', 'google']}>
+        <CrossmintWalletProvider
+          createOnLogin="all-users"
+          callbacks={{
+            onWalletCreationStart: async () => {
+              console.log('Creating wallet...');
+            },
+            onTransactionStart: async () => {
+              console.log('Transaction starting...');
+            }
+          }}
+        >
+          {/* Your app */}
+        </CrossmintWalletProvider>
+      </CrossmintAuthProvider>
+    </CrossmintProvider>
+  );
+}
+```
+
+### Props
+
+<ParamField path="createOnLogin" type="CreateOnLogin" optional>
+  Automatic wallet creation strategy
+  
+  <Expandable title="CreateOnLogin type">
+    ```typescript
+    type CreateOnLogin = 
+      | "all-users"          // Create wallet for all users on login
+      | "evm-only"           // Create only EVM wallets
+      | "solana-only"        // Create only Solana wallets
+      | {
+          chains: Array<"evm" | "solana">;
+        }
+    ```
+  </Expandable>
+  
+  **Example:**
+  ```tsx
+  // Create EVM and Solana wallets
+  createOnLogin={{ chains: ["evm", "solana"] }}
+  
+  // Create only EVM wallets
+  createOnLogin="evm-only"
+  ```
+</ParamField>
+
+<ParamField path="appearance" type="UIConfig" optional>
+  Customize wallet UI components (same structure as `CrossmintAuthProvider`)
+</ParamField>
+
+<ParamField path="showPasskeyHelpers" type="boolean" optional default={true}>
+  Show passkey helper UI for wallet security
+</ParamField>
+
+<ParamField path="callbacks" type="object" optional>
+  Lifecycle callbacks for wallet operations
+  
+  <Expandable title="properties">
+    <ParamField path="onWalletCreationStart" type="() => Promise<void>" optional>
+      Called before wallet creation begins
+      
+      **Example:**
+      ```tsx
+      onWalletCreationStart: async () => {
+        setLoading(true);
+        await trackEvent('wallet_creation_started');
+      }
+      ```
+    </ParamField>
+    
+    <ParamField path="onTransactionStart" type="() => Promise<void>" optional>
+      Called before a transaction is sent
+      
+      **Example:**
+      ```tsx
+      onTransactionStart: async () => {
+        showNotification('Preparing transaction...');
+      }
+      ```
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="children" type="ReactNode" required>
+  Your application components
+</ParamField>
+
+### Context Value
+
+Provides wallet functionality through the Crossmint SDK:
+
+```tsx
+import { useCrossmint } from '@crossmint/client-sdk-react-ui';
+
+function WalletComponent() {
+  const { crossmint } = useCrossmint();
+  
+  const createWallet = async () => {
+    const wallet = await crossmint.wallets.create({
+      chain: 'ethereum'
+    });
+    console.log('Wallet created:', wallet.address);
+  };
+  
+  return <button onClick={createWallet}>Create Wallet</button>;
+}
+```
+
+## Complete Provider Stack
+
+Typical provider hierarchy for a full-featured application:
+
+```tsx
+import {
+  CrossmintProvider,
+  CrossmintAuthProvider,
+  CrossmintWalletProvider,
+  useCrossmintAuth
+} from '@crossmint/client-sdk-react-ui';
+
+function App() {
+  return (
+    <CrossmintProvider 
+      apiKey={process.env.NEXT_PUBLIC_CROSSMINT_API_KEY}
+      consoleLogLevel="warn"
+    >
+      <CrossmintAuthProvider
+        loginMethods={['email', 'google', 'farcaster', 'web3-injected']}
+        appearance={{
+          colors: {
+            accent: '#4F46E5',
+            textPrimary: '#111827',
+            textSecondary: '#6B7280'
+          },
+          fontFamily: "'Inter', sans-serif"
+        }}
+        authModalTitle="Sign in to MyApp"
+        termsOfServiceText={
+          <p>
+            By signing in, you agree to our{' '}
+            <a href="https://example.com/terms">Terms</a>
+          </p>
+        }
+        onLoginSuccess={() => {
+          console.log('User logged in');
+          router.push('/dashboard');
+        }}
+        refreshRoute="/api/auth/refresh"
+        logoutRoute="/api/auth/logout"
+      >
+        <CrossmintWalletProvider
+          createOnLogin={{ chains: ['evm', 'solana'] }}
+          showPasskeyHelpers
+          callbacks={{
+            onWalletCreationStart: async () => {
+              console.log('Creating wallet...');
+            },
+            onTransactionStart: async () => {
+              console.log('Transaction starting...');
+            }
+          }}
+        >
+          <Dashboard />
+        </CrossmintWalletProvider>
+      </CrossmintAuthProvider>
+    </CrossmintProvider>
+  );
+}
+
+function Dashboard() {
+  const { user, status, logout } = useCrossmintAuth();
+  
+  if (status === 'logged-out') {
+    return <div>Please sign in</div>;
+  }
+  
+  return (
+    <div>
+      <h1>Welcome, {user?.email}</h1>
+      <button onClick={logout}>Sign Out</button>
+    </div>
+  );
+}
+```
+
+## Provider Requirements
+
+- `CrossmintProvider` is **required** for all Crossmint functionality
+- `CrossmintAuthProvider` is required for `useCrossmintAuth()` hook
+- `CrossmintWalletProvider` requires `CrossmintAuthProvider` to be present
+- Providers must be nested in the correct order:
+
+```tsx
+<CrossmintProvider>
+  <CrossmintAuthProvider>
+    <CrossmintWalletProvider>
+      {/* Your app */}
+    </CrossmintWalletProvider>
+  </CrossmintAuthProvider>
+</CrossmintProvider>
+```
+
+## Next.js Server-Side Authentication
+
+For Next.js applications with server-side rendering, provide custom routes:
+
+```tsx
+// app/layout.tsx
+<CrossmintAuthProvider
+  refreshRoute="/api/auth/refresh"
+  logoutRoute="/api/auth/logout"
+>
+  {children}
+</CrossmintAuthProvider>
+```
+
+```typescript
+// app/api/auth/refresh/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+
+export async function POST(request: NextRequest) {
+  // Implement token refresh logic
+  // Set secure HTTP-only cookies
+  return NextResponse.json({ success: true });
+}
+```
+
+```typescript
+// app/api/auth/logout/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+
+export async function POST(request: NextRequest) {
+  // Clear authentication cookies
+  const response = NextResponse.json({ success: true });
+  response.cookies.delete('session');
+  response.cookies.delete('refresh_token');
+  return response;
+}
+```

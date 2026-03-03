@@ -1,0 +1,493 @@
+---
+title: 'Multi-Chain Support'
+description: 'Build blockchain applications that work across multiple networks'
+---
+
+Crossmint provides seamless support for multiple blockchain networks, allowing you to build applications that work across EVM-compatible chains and Solana.
+
+## Supported Chains
+
+Crossmint supports a wide range of blockchain networks:
+
+<CardGroup cols={3}>
+  <Card title="Ethereum" icon="ethereum">
+    Mainnet & Sepolia testnet
+  </Card>
+  <Card title="Polygon" icon="link">
+    Mainnet & Amoy testnet
+  </Card>
+  <Card title="Base" icon="link">
+    Mainnet & Sepolia testnet
+  </Card>
+  <Card title="Solana" icon="link">
+    Mainnet & Devnet
+  </Card>
+  <Card title="Arbitrum" icon="link">
+    One & Sepolia
+  </Card>
+  <Card title="Optimism" icon="link">
+    Mainnet & Sepolia
+  </Card>
+</CardGroup>
+
+## Chain Identifiers
+
+Each chain has a unique identifier used throughout the SDK:
+
+### EVM Chains
+```typescript
+"ethereum"           // Ethereum Mainnet
+"ethereum-sepolia"   // Ethereum Sepolia Testnet
+"polygon"            // Polygon Mainnet
+"polygon-amoy"       // Polygon Amoy Testnet
+"base"               // Base Mainnet
+"base-sepolia"       // Base Sepolia Testnet
+"arbitrum"           // Arbitrum One
+"arbitrum-sepolia"   // Arbitrum Sepolia
+"optimism"           // Optimism Mainnet
+"optimism-sepolia"   // Optimism Sepolia
+```
+
+### Non-EVM Chains
+```typescript
+"solana"             // Solana Mainnet
+"solana-devnet"      // Solana Devnet
+```
+
+## Creating Multi-Chain Wallets
+
+Create wallets for users on different chains:
+
+<Steps>
+  <Step title="Initialize the SDK">
+    ```typescript
+    import { createCrossmint } from "@crossmint/common-sdk-base";
+    import { CrossmintWallets } from "@crossmint/wallets-sdk";
+
+    const crossmint = createCrossmint({
+      apiKey: "YOUR_API_KEY",
+    });
+
+    const wallets = CrossmintWallets.from(crossmint);
+    ```
+  </Step>
+
+  <Step title="Create wallets on different chains">
+    ```typescript
+    const userId = "user-123";
+
+    // Ethereum wallet
+    const ethWallet = await wallets.getOrCreateWallet({
+      chain: "ethereum-sepolia",
+      signer: {
+        type: "api-key",
+        locator: userId,
+      },
+    });
+
+    // Polygon wallet
+    const polygonWallet = await wallets.getOrCreateWallet({
+      chain: "polygon-amoy",
+      signer: {
+        type: "api-key",
+        locator: userId,
+      },
+    });
+
+    // Solana wallet
+    const solanaWallet = await wallets.getOrCreateWallet({
+      chain: "solana-devnet",
+      signer: {
+        type: "api-key",
+        locator: userId,
+      },
+    });
+
+    console.log("ETH address:", ethWallet.address);
+    console.log("Polygon address:", polygonWallet.address);
+    console.log("Solana address:", solanaWallet.address);
+    ```
+  </Step>
+</Steps>
+
+<Tip>
+  EVM chains (Ethereum, Polygon, Base, etc.) will generate the same address for a given user. Solana wallets have different addresses.
+</Tip>
+
+## Chain-Specific Operations
+
+### EVM Chains
+
+Work with Ethereum-compatible chains:
+
+```typescript
+import { EVMWallet } from "@crossmint/wallets-sdk";
+
+const wallet = await wallets.getOrCreateWallet({
+  chain: "polygon-amoy",
+  signer: { type: "api-key", locator: userId },
+});
+
+const evmWallet = EVMWallet.from(wallet);
+
+// Send native currency (MATIC)
+const tx = await evmWallet.sendTransaction({
+  to: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+  value: "0.1",
+});
+
+// Call smart contract
+const contractTx = await evmWallet.sendTransaction({
+  to: "0xContractAddress",
+  abi: [...], // Contract ABI
+  functionName: "mint",
+  args: ["0xRecipient", 1],
+});
+
+// Sign message
+const signature = await evmWallet.signMessage({
+  message: "Hello from Polygon!",
+});
+```
+
+### Solana
+
+Work with Solana blockchain:
+
+```typescript
+import { SolanaWallet } from "@crossmint/wallets-sdk";
+import { Transaction, SystemProgram, PublicKey } from "@solana/web3.js";
+
+const wallet = await wallets.getOrCreateWallet({
+  chain: "solana-devnet",
+  signer: { type: "api-key", locator: userId },
+});
+
+const solanaWallet = SolanaWallet.from(wallet);
+
+// Create transaction
+const transaction = new Transaction().add(
+  SystemProgram.transfer({
+    fromPubkey: new PublicKey(solanaWallet.address),
+    toPubkey: new PublicKey("recipient-address"),
+    lamports: 1000000, // 0.001 SOL
+  })
+);
+
+// Send transaction
+const serialized = transaction.serialize().toString("base64");
+const result = await solanaWallet.sendTransaction({
+  serializedTransaction: serialized,
+});
+
+console.log("Transaction hash:", result.hash);
+```
+
+## Multi-Chain NFT Checkout
+
+Accept payments for NFTs on any supported chain:
+
+### Ethereum NFT
+
+```tsx
+import { CrossmintHostedCheckout } from "@crossmint/client-sdk-react-ui";
+
+function EthereumNFTCheckout() {
+  return (
+    <CrossmintHostedCheckout
+      lineItems={{
+        collectionLocator: "crossmint:ethereum-collection-id",
+        callData: {
+          totalPrice: "0.01",
+          quantity: 1,
+        },
+      }}
+      payment={{
+        fiat: { enabled: true },
+        crypto: { enabled: true },
+      }}
+    />
+  );
+}
+```
+
+### Solana NFT
+
+```tsx
+function SolanaNFTCheckout() {
+  return (
+    <CrossmintHostedCheckout
+      lineItems={{
+        tokenLocator: "solana:token-mint-address",
+        executionParameters: {
+          mode: "exact-in",
+          amount: "1",
+        },
+      }}
+      payment={{
+        fiat: { enabled: true },
+        crypto: { enabled: true },
+      }}
+    />
+  );
+}
+```
+
+### Polygon NFT
+
+```tsx
+function PolygonNFTCheckout() {
+  return (
+    <CrossmintEmbeddedCheckout
+      lineItems={{
+        collectionLocator: "crossmint:polygon-collection-id",
+        callData: {
+          totalPrice: "0.001",
+          quantity: 1,
+        },
+      }}
+      recipient={{
+        walletAddress: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+      }}
+      payment={{
+        fiat: { enabled: true },
+      }}
+    />
+  );
+}
+```
+
+## Checking Balances Across Chains
+
+Retrieve balances for wallets on different chains:
+
+```typescript
+async function getAllBalances(userId: string) {
+  const chains = [
+    "ethereum-sepolia",
+    "polygon-amoy",
+    "base-sepolia",
+    "solana-devnet",
+  ] as const;
+
+  const balances = await Promise.all(
+    chains.map(async (chain) => {
+      const wallet = await wallets.getOrCreateWallet({
+        chain,
+        signer: { type: "api-key", locator: userId },
+      });
+
+      const balance = await wallet.getBalance();
+
+      return {
+        chain,
+        address: wallet.address,
+        native: balance.native.formatted,
+        symbol: balance.native.symbol,
+      };
+    })
+  );
+
+  return balances;
+}
+
+// Usage
+const userBalances = await getAllBalances("user-123");
+console.log(userBalances);
+// [
+//   { chain: "ethereum-sepolia", address: "0x...", native: "0.5", symbol: "ETH" },
+//   { chain: "polygon-amoy", address: "0x...", native: "10.0", symbol: "MATIC" },
+//   { chain: "base-sepolia", address: "0x...", native: "1.2", symbol: "ETH" },
+//   { chain: "solana-devnet", address: "...", native: "2.5", symbol: "SOL" },
+// ]
+```
+
+## Chain Detection
+
+Detect which chain a wallet belongs to:
+
+```typescript
+import { isValidEvmAddress, isValidSolanaAddress } from "@crossmint/common-sdk-base";
+
+function detectChainType(address: string) {
+  if (isValidEvmAddress(address)) {
+    return "evm";
+  } else if (isValidSolanaAddress(address)) {
+    return "solana";
+  }
+  return "unknown";
+}
+
+const chainType = detectChainType("0x742d35Cc...");
+console.log(chainType); // "evm"
+```
+
+## Token Locators
+
+Reference tokens across different chains using locators:
+
+```typescript
+// Ethereum token
+const ethToken = "ethereum:0x1234567890123456789012345678901234567890";
+
+// Polygon token
+const polygonToken = "polygon:0x1234567890123456789012345678901234567890";
+
+// Solana token
+const solanaToken = "solana:TokenMintAddressHere123456789";
+
+// Use in checkout
+<CrossmintEmbeddedCheckout
+  lineItems={{
+    tokenLocator: polygonToken,
+    executionParameters: {
+      mode: "exact-in",
+      amount: "1",
+    },
+  }}
+/>
+```
+
+## Cross-Chain Transactions
+
+<Warning>
+  Crossmint handles each blockchain separately. For true cross-chain transfers (bridging), integrate additional bridge protocols.
+</Warning>
+
+Example multi-chain workflow:
+
+```typescript
+async function multiChainWorkflow(userId: string) {
+  // 1. Create wallets on multiple chains
+  const ethWallet = await wallets.getOrCreateWallet({
+    chain: "ethereum-sepolia",
+    signer: { type: "api-key", locator: userId },
+  });
+
+  const solWallet = await wallets.getOrCreateWallet({
+    chain: "solana-devnet",
+    signer: { type: "api-key", locator: userId },
+  });
+
+  // 2. Check balances
+  const ethBalance = await ethWallet.getBalance();
+  const solBalance = await solWallet.getBalance();
+
+  console.log(`ETH Balance: ${ethBalance.native.formatted} ETH`);
+  console.log(`SOL Balance: ${solBalance.native.formatted} SOL`);
+
+  // 3. Execute chain-specific transactions
+  if (parseFloat(ethBalance.native.raw) > 0) {
+    const evmWallet = EVMWallet.from(ethWallet);
+    await evmWallet.sendTransaction({
+      to: "0xRecipient",
+      value: "0.001",
+    });
+  }
+
+  if (parseFloat(solBalance.native.raw) > 0) {
+    const solanaWallet = SolanaWallet.from(solWallet);
+    // Execute Solana transaction
+  }
+}
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Use consistent user identifiers">
+    Use the same user ID across all chains for easier management:
+    ```typescript
+    const userId = "user-123";
+    
+    // All chains use the same userId
+    const ethWallet = await wallets.getOrCreateWallet({
+      chain: "ethereum-sepolia",
+      signer: { type: "api-key", locator: userId },
+    });
+    
+    const solWallet = await wallets.getOrCreateWallet({
+      chain: "solana-devnet",
+      signer: { type: "api-key", locator: userId },
+    });
+    ```
+  </Step>
+
+  <Step title="Cache wallet addresses by chain">
+    Store addresses per chain to minimize API calls:
+    ```typescript
+    interface UserWallets {
+      userId: string;
+      ethereum?: string;
+      polygon?: string;
+      solana?: string;
+    }
+    
+    // Store in database
+    await db.wallets.upsert({
+      userId: "user-123",
+      ethereum: ethWallet.address,
+      polygon: polygonWallet.address,
+      solana: solanaWallet.address,
+    });
+    ```
+  </Step>
+
+  <Step title="Handle chain-specific errors">
+    ```typescript
+    try {
+      const wallet = await wallets.getOrCreateWallet({
+        chain: "ethereum-sepolia",
+        signer: { type: "api-key", locator: userId },
+      });
+    } catch (error) {
+      if (error.message.includes("insufficient funds")) {
+        // Handle insufficient funds on this specific chain
+      } else if (error.message.includes("rate limit")) {
+        // Handle rate limiting
+      }
+    }
+    ```
+  </Step>
+
+  <Step title="Test on testnets first">
+    Always test multi-chain functionality on testnets before production:
+    - `ethereum-sepolia` for Ethereum
+    - `polygon-amoy` for Polygon
+    - `base-sepolia` for Base
+    - `solana-devnet` for Solana
+  </Step>
+</Steps>
+
+## Chain-Specific Considerations
+
+### Gas Fees
+
+Different chains have different gas fee structures:
+
+| Chain | Native Token | Typical Gas Fee |
+|-------|--------------|----------------|
+| Ethereum | ETH | High ($5-50+) |
+| Polygon | MATIC | Very Low ($0.01-0.10) |
+| Base | ETH | Low ($0.10-1.00) |
+| Solana | SOL | Very Low ($0.0001-0.001) |
+
+### Transaction Speed
+
+| Chain | Block Time | Finality |
+|-------|-----------|----------|
+| Ethereum | ~12 seconds | ~2-3 minutes |
+| Polygon | ~2 seconds | ~30 seconds |
+| Base | ~2 seconds | ~30 seconds |
+| Solana | ~0.4 seconds | ~6 seconds |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Custom Transactions" icon="code" href="/guides/custom-transactions">
+    Build custom transactions for each chain
+  </Card>
+  <Card title="Embedded Wallets" icon="wallet" href="/guides/embedded-wallets">
+    Manage wallets across multiple chains
+  </Card>
+</CardGroup>

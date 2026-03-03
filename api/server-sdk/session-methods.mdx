@@ -1,0 +1,294 @@
+---
+title: 'Session methods'
+description: 'Methods for managing user sessions, token refresh, and logout'
+---
+
+# Session methods
+
+The `CrossmintAuth` class provides methods for managing user sessions, handling token refresh, and logging out users.
+
+## getSession()
+
+Retrieves and validates the current user session. If the JWT is expired, automatically refreshes it using the refresh token.
+
+```javascript
+import { CrossmintAuth } from '@crossmint/server-sdk';
+
+const session = await auth.getSession(request, response);
+```
+
+### Parameters
+
+<ParamField path="options" type="GenericRequest | AuthMaterialBasic" required>
+  Either an HTTP request object or authentication material.
+
+  **GenericRequest**: Node.js `IncomingMessage` or Web API `Request`. The method will extract authentication tokens from cookies.
+
+  **AuthMaterialBasic**: Object with authentication tokens.
+  <Expandable title="properties">
+    <ParamField path="jwt" type="string">
+      The JWT access token (optional).
+    </ParamField>
+
+    <ParamField path="refreshToken" type="string" required>
+      The refresh token.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="response" type="GenericResponse">
+  The HTTP response object (Node.js `ServerResponse` or Web API `Response`). Required if you want refreshed tokens to be automatically stored in cookies.
+</ParamField>
+
+### Returns
+
+**Type:** `Promise<AuthSession>`
+
+Returns a session object containing:
+
+<ResponseField name="jwt" type="string" required>
+  The JWT access token (refreshed if expired).
+</ResponseField>
+
+<ResponseField name="refreshToken" type="RefreshToken" required>
+  The refresh token object.
+  <Expandable title="properties">
+    <ResponseField name="secret" type="string" required>
+      The refresh token secret.
+    </ResponseField>
+    <ResponseField name="expiresAt" type="string" required>
+      ISO 8601 timestamp of token expiration.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="userId" type="string" required>
+  The user's unique identifier.
+</ResponseField>
+
+### Examples
+
+#### With request and response objects
+
+```javascript
+// Next.js API route
+export async function GET(request) {
+  const response = new Response();
+  
+  try {
+    const session = await auth.getSession(request, response);
+    return Response.json({ userId: session.userId });
+  } catch (error) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+}
+```
+
+#### With authentication material
+
+```javascript
+const session = await auth.getSession({
+  jwt: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+  refreshToken: 'refresh_token_secret'
+});
+```
+
+#### Node.js Express
+
+```javascript
+app.get('/api/session', async (req, res) => {
+  try {
+    const session = await auth.getSession(req, res);
+    res.json({ userId: session.userId });
+  } catch (error) {
+    res.status(401).json({ error: 'Unauthorized' });
+  }
+});
+```
+
+### Error handling
+
+Throws `CrossmintAuthenticationError` if:
+- No authentication material is found
+- Refresh token is missing
+- Token refresh fails
+- JWT verification fails
+
+If a `response` object is provided, the method automatically calls `logout()` to clear cookies when authentication fails.
+
+## handleCustomRefresh()
+
+Handles token refresh requests from clients. Accepts refresh tokens from either the request body or cookies, refreshes the authentication material, and stores it in cookies.
+
+```javascript
+const response = await auth.handleCustomRefresh(request, response);
+```
+
+### Parameters
+
+<ParamField path="request" type="GenericRequest" required>
+  The HTTP request object (Node.js `IncomingMessage` or Web API `Request`).
+</ParamField>
+
+<ParamField path="response" type="GenericResponse">
+  The HTTP response object (Node.js `ServerResponse` or Web API `Response`).
+</ParamField>
+
+### Returns
+
+**Type:** `Promise<GenericResponse>`
+
+Returns a response object with:
+- Refreshed authentication material in the response body
+- Updated authentication cookies (via `Set-Cookie` headers)
+- Status 401 with error message if refresh fails
+
+### Example implementation
+
+#### Next.js API route
+
+```javascript
+import { CrossmintAuth } from '@crossmint/server-sdk';
+
+export async function POST(request) {
+  const auth = CrossmintAuth.from(crossmint);
+  const response = await auth.handleCustomRefresh(request);
+  return response;
+}
+```
+
+#### Express.js
+
+```javascript
+app.post('/api/auth/refresh', async (req, res) => {
+  await auth.handleCustomRefresh(req, res);
+  res.end();
+});
+```
+
+### Request body format
+
+The method accepts an optional refresh token in the request body:
+
+```json
+{
+  "refresh": "refresh_token_secret"
+}
+```
+
+If not provided in the body, the method attempts to extract the refresh token from cookies.
+
+### Response format
+
+**Success (200):**
+
+```json
+{
+  "jwt": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refreshToken": {
+    "secret": "new_refresh_token",
+    "expiresAt": "2024-12-31T23:59:59Z"
+  },
+  "user": {
+    "id": "user_123",
+    "email": "user@example.com"
+  }
+}
+```
+
+**Error (401):**
+
+```json
+{
+  "error": "Unauthorized",
+  "message": "Please provide a refresh token either in the request body or cookies"
+}
+```
+
+### Notes
+
+<Note>
+This method automatically handles both Node.js and Web API request/response objects, adapting its behavior based on the runtime environment.
+</Note>
+
+<Warning>
+If refresh fails, the method automatically clears authentication cookies by calling `logout()`.
+</Warning>
+
+## logout()
+
+Logs out a user by clearing authentication cookies and optionally calling the Crossmint logout endpoint.
+
+```javascript
+const response = await auth.logout(request, response);
+```
+
+### Parameters
+
+<ParamField path="request" type="GenericRequest">
+  The HTTP request object. Used to extract the refresh token for calling the logout endpoint.
+</ParamField>
+
+<ParamField path="response" type="GenericResponse">
+  The HTTP response object. If not provided, creates a new `Response` object.
+</ParamField>
+
+### Returns
+
+**Type:** `Promise<GenericResponse>`
+
+Returns a response object with cleared authentication cookies (empty values with expired dates).
+
+### Examples
+
+#### Next.js API route
+
+```javascript
+export async function POST(request) {
+  const response = await auth.logout(request);
+  return response;
+}
+```
+
+#### Express.js
+
+```javascript
+app.post('/api/auth/logout', async (req, res) => {
+  await auth.logout(req, res);
+  res.json({ success: true });
+});
+```
+
+#### Client-side redirect after logout
+
+```javascript
+export async function POST(request) {
+  await auth.logout(request);
+  return Response.redirect('/login');
+}
+```
+
+### Behavior
+
+The method performs the following actions:
+
+1. Attempts to call the Crossmint logout endpoint with the refresh token (if available)
+2. Clears authentication cookies by setting them to empty values with expired dates
+3. Returns the response object with updated headers
+
+<Info>
+The method always clears cookies, even if calling the Crossmint logout endpoint fails. This ensures users can log out even if the server is unreachable.
+</Info>
+
+### Error handling
+
+Errors from the Crossmint logout endpoint are logged but do not prevent cookie clearing. The method always completes successfully.
+
+```javascript
+try {
+  await auth.logout(request, response);
+  // Cookies are always cleared
+} catch (error) {
+  // This should not happen as logout always succeeds
+}
+```

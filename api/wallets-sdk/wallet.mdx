@@ -1,0 +1,487 @@
+---
+title: "Wallet"
+description: "Base wallet class with common functionality"
+---
+
+The `Wallet` class is the base class for all wallet types. It provides common functionality for balance queries, transactions, delegated signers, and more.
+
+## Properties
+
+<ParamField path="chain" type="Chain">
+  The blockchain network this wallet operates on
+</ParamField>
+
+<ParamField path="address" type="string">
+  The wallet's address on the blockchain
+</ParamField>
+
+<ParamField path="owner" type="string | undefined">
+  Optional owner identifier
+</ParamField>
+
+<ParamField path="alias" type="string | undefined">
+  Optional wallet alias
+</ParamField>
+
+<ParamField path="signer" type="Signer">
+  The signer used for authentication and signing
+</ParamField>
+
+## Balance Methods
+
+### balances()
+
+Get the wallet balances including native token, USDC, and optionally other tokens.
+
+```typescript
+public async balances(tokens?: string[]): Promise<Balances<C>>
+```
+
+<ParamField path="tokens" type="string[]">
+  Additional token addresses to query (native token and USDC are always included)
+</ParamField>
+
+<ResponseField name="balances" type="Balances<C>">
+  The wallet balances
+  
+  <Expandable title="properties">
+    <ResponseField name="nativeToken" type="TokenBalance<C>">
+      Native token balance (ETH, SOL, XLM)
+      
+      <Expandable title="properties">
+        <ResponseField name="symbol" type="string">
+          Token symbol
+        </ResponseField>
+        <ResponseField name="name" type="string">
+          Token name
+        </ResponseField>
+        <ResponseField name="amount" type="string">
+          Formatted amount (decimal units)
+        </ResponseField>
+        <ResponseField name="decimals" type="number">
+          Token decimals
+        </ResponseField>
+        <ResponseField name="rawAmount" type="string">
+          Raw amount (smallest unit)
+        </ResponseField>
+        <ResponseField name="contractAddress" type="string | undefined">
+          EVM: Contract address
+        </ResponseField>
+        <ResponseField name="mintHash" type="string | undefined">
+          Solana: Mint hash
+        </ResponseField>
+        <ResponseField name="contractId" type="string | undefined">
+          Stellar: Contract ID
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="usdc" type="TokenBalance<C>">
+      USDC balance
+    </ResponseField>
+    
+    <ResponseField name="tokens" type="TokenBalance<C>[]">
+      Additional token balances
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+#### Example
+
+```typescript
+const balances = await wallet.balances([
+  "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48" // Additional token
+]);
+
+console.log("ETH Balance:", balances.nativeToken.amount);
+console.log("USDC Balance:", balances.usdc.amount);
+console.log("Other tokens:", balances.tokens);
+```
+
+### stagingFund()
+
+Fund the wallet with Crossmint's stablecoin (USDXM). **Note:** This method is only available in staging environments.
+
+```typescript
+public async stagingFund(
+  amount: number,
+  chain?: Chain
+): Promise<FundWalletResponse>
+```
+
+<ParamField path="amount" type="number" required>
+  The amount of USDXM to fund the wallet with
+</ParamField>
+
+<ParamField path="chain" type="Chain">
+  Optional chain to fund on. If not provided, uses the wallet's default chain
+</ParamField>
+
+<ResponseField name="response" type="FundWalletResponse">
+  The funding response
+</ResponseField>
+
+#### Example
+
+```typescript
+const fundResponse = await wallet.stagingFund(100);
+console.log("Wallet funded:", fundResponse);
+```
+
+## Transaction Methods
+
+### send()
+
+Send tokens to a wallet address or user locator.
+
+```typescript
+public async send<T extends SendTokenTransactionOptions | undefined = undefined>(
+  to: string | UserLocator,
+  token: string,
+  amount: string,
+  options?: T
+): Promise<Transaction<T extends PrepareOnly<true> ? true : false>>
+```
+
+<ParamField path="to" type="string | UserLocator" required>
+  Recipient wallet address or user locator (email, phone, etc.)
+  
+  <Expandable title="UserLocator types">
+    <ParamField path="email" type="string">
+      Email address: `{ email: "user@example.com" }`
+    </ParamField>
+    <ParamField path="phone" type="string">
+      Phone number: `{ phone: "+1234567890" }`
+    </ParamField>
+    <ParamField path="x" type="string">
+      X/Twitter handle: `{ x: "@username" }`
+    </ParamField>
+    <ParamField path="userId" type="string">
+      User ID: `{ userId: "user123" }`
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="token" type="string" required>
+  Token contract address or currency symbol (e.g., "usdc", "eth")
+</ParamField>
+
+<ParamField path="amount" type="string" required>
+  Amount to send in decimal units (e.g., "1.5" for 1.5 tokens)
+</ParamField>
+
+<ParamField path="options" type="SendTokenTransactionOptions">
+  Transaction options
+  
+  <Expandable title="properties">
+    <ParamField path="experimental_prepareOnly" type="boolean">
+      If true, returns transaction ID without auto-approving
+    </ParamField>
+    <ParamField path="experimental_signer" type="string">
+      Custom signer locator
+    </ParamField>
+    <ParamField path="transactionType" type="'onramp' | 'regulated-transfer' | 'direct'">
+      Transaction type for compliance
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ResponseField name="transaction" type="Transaction">
+  The transaction result
+  
+  <Expandable title="properties">
+    <ResponseField name="hash" type="string">
+      Transaction hash (undefined if prepareOnly)
+    </ResponseField>
+    <ResponseField name="explorerLink" type="string">
+      Block explorer link (undefined if prepareOnly)
+    </ResponseField>
+    <ResponseField name="transactionId" type="string">
+      Internal transaction ID
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+#### Example
+
+```typescript
+// Send to wallet address
+const tx = await wallet.send(
+  "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+  "usdc",
+  "10.50"
+);
+
+console.log("Transaction hash:", tx.hash);
+console.log("Explorer:", tx.explorerLink);
+
+// Send to email
+const tx2 = await wallet.send(
+  { email: "user@example.com" },
+  "usdc",
+  "5.0"
+);
+
+// Prepare only (don't auto-approve)
+const tx3 = await wallet.send(
+  "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+  "usdc",
+  "10.50",
+  { experimental_prepareOnly: true }
+);
+console.log("Transaction ID:", tx3.transactionId);
+// Later: await wallet.approve({ transactionId: tx3.transactionId });
+```
+
+### approve()
+
+Approve a transaction or signature that is awaiting approval.
+
+```typescript
+public async approve<T extends ApproveParams>(
+  params: T
+): Promise<ApproveResult<T>>
+```
+
+<ParamField path="params" type="ApproveParams" required>
+  Approval parameters
+  
+  <Expandable title="properties">
+    <ParamField path="transactionId" type="string">
+      Transaction ID to approve (either this or signatureId required)
+    </ParamField>
+    <ParamField path="signatureId" type="string">
+      Signature ID to approve (either this or transactionId required)
+    </ParamField>
+    <ParamField path="options" type="ApproveOptions">
+      Approval options
+      
+      <Expandable title="properties">
+        <ParamField path="experimental_approval" type="Approval">
+          External approval signature
+        </ParamField>
+        <ParamField path="additionalSigners" type="Signer[]">
+          Additional signers for multi-sig wallets
+        </ParamField>
+      </Expandable>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ResponseField name="result" type="Transaction | Signature">
+  The approved transaction or signature result
+</ResponseField>
+
+#### Example
+
+```typescript
+// Approve a transaction
+const result = await wallet.approve({
+  transactionId: "tx_123abc"
+});
+console.log("Transaction hash:", result.hash);
+
+// Approve a signature
+const sigResult = await wallet.approve({
+  signatureId: "sig_456def"
+});
+console.log("Signature:", sigResult.signature);
+```
+
+## Delegated Signers
+
+### addDelegatedSigner()
+
+Add a delegated signer to the wallet for gasless transactions or multi-sig.
+
+```typescript
+public async addDelegatedSigner<T extends AddDelegatedSignerOptions | undefined = undefined>(params: {
+  signer: string | RegisterSignerPasskeyParams;
+  options?: T;
+}): Promise<T extends PrepareOnly<true> ? AddDelegatedSignerReturnType<C> : void>
+```
+
+<ParamField path="params" type="object" required>
+  <Expandable title="properties">
+    <ParamField path="signer" type="string | RegisterSignerPasskeyParams" required>
+      For Solana: wallet address string. For EVM: wallet address or passkey configuration
+    </ParamField>
+    <ParamField path="options" type="AddDelegatedSignerOptions">
+      <Expandable title="properties">
+        <ParamField path="experimental_prepareOnly" type="boolean">
+          If true, returns transaction/signature ID without auto-approving
+        </ParamField>
+      </Expandable>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ResponseField name="result" type="void | AddDelegatedSignerReturnType<C>">
+  Returns void if approved, or transaction/signature ID if prepareOnly
+</ResponseField>
+
+#### Example
+
+```typescript
+// Add delegated signer (auto-approve)
+await wallet.addDelegatedSigner({
+  signer: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
+});
+
+// Add delegated signer (prepare only)
+const result = await wallet.addDelegatedSigner({
+  signer: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+  options: { experimental_prepareOnly: true }
+});
+
+// For Solana, returns transactionId
+if ('transactionId' in result) {
+  await wallet.approve({ transactionId: result.transactionId });
+}
+// For EVM, returns signatureId
+if ('signatureId' in result) {
+  await wallet.approve({ signatureId: result.signatureId });
+}
+```
+
+### delegatedSigners()
+
+List all delegated signers for this wallet.
+
+```typescript
+public async delegatedSigners(): Promise<DelegatedSigner[]>
+```
+
+<ResponseField name="signers" type="DelegatedSigner[]">
+  Array of delegated signers
+  
+  <Expandable title="properties">
+    <ResponseField name="signer" type="string">
+      Signer locator in format `external-wallet:address`
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+#### Example
+
+```typescript
+const signers = await wallet.delegatedSigners();
+console.log("Delegated signers:", signers);
+// [{ signer: "external-wallet:0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb" }]
+```
+
+## Experimental Methods
+
+### experimental_apiClient()
+
+Get the underlying API client.
+
+```typescript
+public experimental_apiClient(): ApiClient
+```
+
+<ResponseField name="apiClient" type="ApiClient">
+  The API client instance
+</ResponseField>
+
+### experimental_nfts()
+
+Get NFTs owned by the wallet.
+
+```typescript
+public async experimental_nfts(params: {
+  perPage: number;
+  page: number;
+}): Promise<NftsResponse>
+```
+
+<ParamField path="params" type="object" required>
+  <Expandable title="properties">
+    <ParamField path="perPage" type="number" required>
+      Number of NFTs per page
+    </ParamField>
+    <ParamField path="page" type="number" required>
+      Page number (0-indexed)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+#### Example
+
+```typescript
+const nfts = await wallet.experimental_nfts({
+  perPage: 20,
+  page: 0
+});
+```
+
+### experimental_transactions()
+
+Get all transactions for this wallet.
+
+```typescript
+public async experimental_transactions(): Promise<GetTransactionsResponse>
+```
+
+<ResponseField name="transactions" type="GetTransactionsResponse">
+  List of transactions
+</ResponseField>
+
+#### Example
+
+```typescript
+const transactions = await wallet.experimental_transactions();
+console.log("Transaction history:", transactions);
+```
+
+### experimental_transaction()
+
+Get a specific transaction by ID.
+
+```typescript
+public async experimental_transaction(
+  transactionId: string
+): Promise<GetTransactionSuccessResponse>
+```
+
+<ParamField path="transactionId" type="string" required>
+  The transaction ID
+</ParamField>
+
+<ResponseField name="transaction" type="GetTransactionSuccessResponse">
+  The transaction details
+</ResponseField>
+
+#### Example
+
+```typescript
+const transaction = await wallet.experimental_transaction("tx_123abc");
+console.log("Transaction:", transaction);
+```
+
+### experimental_activity()
+
+Get wallet activity (transactions, transfers, etc.).
+
+```typescript
+public async experimental_activity(): Promise<Activity>
+```
+
+<ResponseField name="activity" type="Activity">
+  Wallet activity data
+</ResponseField>
+
+#### Example
+
+```typescript
+const activity = await wallet.experimental_activity();
+console.log("Wallet activity:", activity);
+```
+
+## Related Types
+
+- [CrossmintWallets](/api/wallets-sdk/crossmint-wallets) - SDK initialization
+- [EVMWallet](/api/wallets-sdk/evm-wallet) - EVM-specific methods
+- [SolanaWallet](/api/wallets-sdk/solana-wallet) - Solana-specific methods
+- [StellarWallet](/api/wallets-sdk/stellar-wallet) - Stellar-specific methods
+- [Types](/api/wallets-sdk/types) - Type definitions

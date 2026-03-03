@@ -1,0 +1,402 @@
+---
+title: "Solana Wallets"
+description: "Work with Solana wallets and execute custom transactions"
+---
+
+## Overview
+
+The `SolanaWallet` class extends the base `Wallet` with Solana-specific functionality for:
+- Sending versioned transactions
+- Handling serialized transactions
+- Managing additional signers
+- Executing Solana programs
+
+## Create a Solana Wallet Instance
+
+Cast a base `Wallet` to `SolanaWallet` for Solana-specific operations:
+
+```typescript
+import { SolanaWallet } from "@crossmint/wallets-sdk";
+
+// Assuming you have a wallet instance
+const solanaWallet = SolanaWallet.from(wallet);
+```
+
+<Note>
+The `SolanaWallet.from()` method will throw an error if the wallet is not on the Solana chain.
+</Note>
+
+## Send Custom Transactions
+
+Execute custom Solana transactions.
+
+### Method Signature
+
+```typescript
+solanaWallet.sendTransaction(params: SolanaTransactionInput): Promise<Transaction>
+```
+
+### With Transaction Object
+
+Send a Solana `VersionedTransaction`:
+
+```typescript
+import { VersionedTransaction } from "@solana/web3.js";
+
+// Build your transaction
+const transaction: VersionedTransaction = /* ... */;
+
+const tx = await solanaWallet.sendTransaction({
+    transaction,
+});
+
+console.log(tx.hash);         // Transaction signature
+console.log(tx.explorerLink); // Solana explorer link
+```
+
+### With Serialized Transaction
+
+Send a base58-encoded serialized transaction:
+
+```typescript
+const serializedTx = "base58-encoded-transaction...";
+
+const tx = await solanaWallet.sendTransaction({
+    serializedTransaction: serializedTx,
+});
+
+console.log(tx.hash);
+console.log(tx.explorerLink);
+```
+
+### With Additional Signers
+
+Include additional signers (e.g., for program-owned accounts):
+
+```typescript
+import { Keypair, VersionedTransaction } from "@solana/web3.js";
+
+// Create additional signer
+const additionalSigner = Keypair.generate();
+
+const transaction: VersionedTransaction = /* ... */;
+
+const tx = await solanaWallet.sendTransaction({
+    transaction,
+    additionalSigners: [additionalSigner],
+});
+```
+
+### Prepare-Only Mode
+
+Create a transaction without executing:
+
+```typescript
+const preparedTx = await solanaWallet.sendTransaction({
+    transaction,
+    options: {
+        experimental_prepareOnly: true,
+    },
+});
+
+console.log(preparedTx.transactionId);
+
+// Approve later
+const completedTx = await wallet.approve({
+    transactionId: preparedTx.transactionId,
+});
+```
+
+### With Custom Signer
+
+```typescript
+const tx = await solanaWallet.sendTransaction({
+    transaction,
+    options: {
+        experimental_signer: "external-wallet:SolanaAddress...",
+    },
+});
+```
+
+### Parameters
+
+<ParamField path="transaction" type="VersionedTransaction">
+  Solana versioned transaction object
+</ParamField>
+
+<ParamField path="serializedTransaction" type="string">
+  Base58-encoded serialized transaction (alternative to transaction)
+</ParamField>
+
+<ParamField path="additionalSigners" type="Keypair[]">
+  Additional keypairs that need to sign the transaction
+</ParamField>
+
+<ParamField path="options" type="TransactionInputOptions">
+  <Expandable title="properties">
+    <ParamField path="experimental_prepareOnly" type="boolean">
+      Create without executing
+    </ParamField>
+    <ParamField path="experimental_signer" type="string">
+      Custom signer locator
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Complete Example: Token Transfer
+
+Transfer SPL tokens using the Solana wallet:
+
+```typescript
+import { CrossmintWallets, createCrossmint, SolanaWallet } from "@crossmint/wallets-sdk";
+import {
+    Connection,
+    PublicKey,
+    Transaction,
+    TransactionMessage,
+    VersionedTransaction,
+} from "@solana/web3.js";
+import { createTransferInstruction, getAssociatedTokenAddress } from "@solana/spl-token";
+
+// Initialize
+const crossmint = createCrossmint({ apiKey: "..." });
+const crossmintWallets = CrossmintWallets.from(crossmint);
+
+// Get wallet
+const wallet = await crossmintWallets.getOrCreateWallet({
+    chain: "solana",
+    signer: {
+        type: "email",
+        email: "user@example.com",
+        onAuthRequired: async (...) => { /* ... */ },
+    },
+});
+
+// Cast to Solana wallet
+const solanaWallet = SolanaWallet.from(wallet);
+
+// Setup connection
+const connection = new Connection("https://api.mainnet-beta.solana.com");
+const walletPubkey = new PublicKey(wallet.address);
+const recipientPubkey = new PublicKey("RecipientAddress...");
+const mintAddress = new PublicKey("TokenMintAddress...");
+
+// Get token accounts
+const sourceTokenAccount = await getAssociatedTokenAddress(
+    mintAddress,
+    walletPubkey
+);
+const destinationTokenAccount = await getAssociatedTokenAddress(
+    mintAddress,
+    recipientPubkey
+);
+
+// Create transfer instruction
+const transferInstruction = createTransferInstruction(
+    sourceTokenAccount,
+    destinationTokenAccount,
+    walletPubkey,
+    1000000 // Amount (with decimals)
+);
+
+// Build transaction
+const { blockhash } = await connection.getLatestBlockhash();
+const messageV0 = new TransactionMessage({
+    payerKey: walletPubkey,
+    recentBlockhash: blockhash,
+    instructions: [transferInstruction],
+}).compileToV0Message();
+
+const transaction = new VersionedTransaction(messageV0);
+
+// Send transaction
+const tx = await solanaWallet.sendTransaction({ transaction });
+
+console.log(`Transfer complete! Transaction: ${tx.explorerLink}`);
+```
+
+## Complete Example: NFT Minting
+
+Mint a Metaplex NFT:
+
+```typescript
+import { CrossmintWallets, createCrossmint, SolanaWallet } from "@crossmint/wallets-sdk";
+import {
+    Connection,
+    PublicKey,
+    TransactionMessage,
+    VersionedTransaction,
+} from "@solana/web3.js";
+import { createMintToInstruction } from "@solana/spl-token";
+
+// Initialize and get wallet
+const crossmint = createCrossmint({ apiKey: "..." });
+const crossmintWallets = CrossmintWallets.from(crossmint);
+const wallet = await crossmintWallets.getOrCreateWallet({
+    chain: "solana",
+    signer: { type: "email", email: "user@example.com", onAuthRequired: async (...) => {...} },
+});
+
+const solanaWallet = SolanaWallet.from(wallet);
+
+// Setup
+const connection = new Connection("https://api.mainnet-beta.solana.com");
+const walletPubkey = new PublicKey(wallet.address);
+
+// Create mint instruction for Metaplex NFT
+// (This is simplified - actual Metaplex minting requires more setup)
+const mintInstruction = /* Create your Metaplex mint instruction */;
+
+// Build transaction
+const { blockhash } = await connection.getLatestBlockhash();
+const messageV0 = new TransactionMessage({
+    payerKey: walletPubkey,
+    recentBlockhash: blockhash,
+    instructions: [mintInstruction],
+}).compileToV0Message();
+
+const transaction = new VersionedTransaction(messageV0);
+
+// Mint NFT
+const tx = await solanaWallet.sendTransaction({ transaction });
+
+console.log(`NFT minted! Transaction: ${tx.explorerLink}`);
+```
+
+## Complete Example: Program Interaction
+
+Interact with a Solana program:
+
+```typescript
+import { CrossmintWallets, createCrossmint, SolanaWallet } from "@crossmint/wallets-sdk";
+import {
+    Connection,
+    PublicKey,
+    TransactionInstruction,
+    TransactionMessage,
+    VersionedTransaction,
+} from "@solana/web3.js";
+
+// Initialize
+const crossmint = createCrossmint({ apiKey: "..." });
+const crossmintWallets = CrossmintWallets.from(crossmint);
+const wallet = await crossmintWallets.getOrCreateWallet({
+    chain: "solana",
+    signer: { type: "email", email: "user@example.com", onAuthRequired: async (...) => {...} },
+});
+
+const solanaWallet = SolanaWallet.from(wallet);
+
+// Setup
+const connection = new Connection("https://api.mainnet-beta.solana.com");
+const walletPubkey = new PublicKey(wallet.address);
+const programId = new PublicKey("YourProgramId...");
+
+// Create program instruction
+const instruction = new TransactionInstruction({
+    keys: [
+        { pubkey: walletPubkey, isSigner: true, isWritable: true },
+        // Add other accounts as needed
+    ],
+    programId,
+    data: Buffer.from([/* your instruction data */]),
+});
+
+// Build and send transaction
+const { blockhash } = await connection.getLatestBlockhash();
+const messageV0 = new TransactionMessage({
+    payerKey: walletPubkey,
+    recentBlockhash: blockhash,
+    instructions: [instruction],
+}).compileToV0Message();
+
+const transaction = new VersionedTransaction(messageV0);
+const tx = await solanaWallet.sendTransaction({ transaction });
+
+console.log(`Program executed! Transaction: ${tx.explorerLink}`);
+```
+
+## Working with External Wallets
+
+Connect Phantom, Solflare, or other Solana wallets:
+
+```typescript
+import { CrossmintWallets, createCrossmint } from "@crossmint/wallets-sdk";
+
+// Assuming Phantom is installed
+const provider = window.solana;
+
+if (!provider?.isPhantom) {
+    throw new Error("Phantom wallet not found");
+}
+
+// Connect to Phantom
+const resp = await provider.connect();
+const phantomAddress = resp.publicKey.toString();
+
+// Create wallet with Phantom as signer
+const crossmint = createCrossmint({ apiKey: "..." });
+const crossmintWallets = CrossmintWallets.from(crossmint);
+
+const wallet = await crossmintWallets.getOrCreateWallet({
+    chain: "solana",
+    signer: {
+        type: "external-wallet",
+        address: phantomAddress,
+        onSignTransaction: async (transaction) => {
+            const signedTx = await provider.signTransaction(transaction);
+            return signedTx;
+        },
+        onSignMessage: async (message) => {
+            const encodedMessage = new TextEncoder().encode(message);
+            const { signature } = await provider.signMessage(encodedMessage);
+            return { signature: Buffer.from(signature).toString("base64") };
+        },
+    },
+});
+```
+
+## Using Simple Token Transfers
+
+For basic token transfers, use the base wallet's `send()` method instead of building transactions manually:
+
+```typescript
+// Simple USDC transfer
+const tx = await wallet.send(
+    "RecipientSolanaAddress...",
+    "usdc",
+    "100"
+);
+
+// Simple SOL transfer
+const tx = await wallet.send(
+    "RecipientSolanaAddress...",
+    "sol",
+    "1.5"
+);
+```
+
+See [Wallet Operations](/wallets-sdk/wallet-operations) for more details.
+
+## Solana Network
+
+The SDK works with:
+- **Mainnet Beta**: Production Solana network
+- **Devnet**: Testing network with free SOL from faucets
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Wallet Operations" icon="list-check" href="/wallets-sdk/wallet-operations">
+    Learn about common wallet operations
+  </Card>
+  <Card title="Delegated Signers" icon="users" href="/wallets-sdk/delegated-signers">
+    Add multiple signers to a wallet
+  </Card>
+  <Card title="EVM Wallets" icon="ethereum" href="/wallets-sdk/evm-wallets">
+    Learn about EVM-specific operations
+  </Card>
+  <Card title="Stellar Wallets" icon="star" href="/wallets-sdk/stellar-wallets">
+    Learn about Stellar-specific operations
+  </Card>
+</CardGroup>

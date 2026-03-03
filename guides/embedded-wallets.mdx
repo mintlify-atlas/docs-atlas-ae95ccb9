@@ -1,0 +1,327 @@
+---
+title: 'Embedded Wallets'
+description: 'Create and manage blockchain wallets for your users without requiring Web3 knowledge'
+---
+
+Crossmint's embedded wallets allow you to create and manage blockchain wallets for your users seamlessly. Users can interact with blockchain applications without needing to understand seed phrases, private keys, or wallet extensions.
+
+## Overview
+
+Embedded wallets provide:
+
+- **Email/Social login** - Users sign in with familiar methods
+- **Multi-chain support** - One wallet across EVM and Solana chains
+- **Custodial & non-custodial options** - Choose the right model for your use case
+- **No seed phrases** - Better UX for non-crypto users
+
+## Installation
+
+```bash
+npm install @crossmint/wallets-sdk @crossmint/common-sdk-base
+```
+
+## Quick Start
+
+<Steps>
+  <Step title="Initialize the Crossmint SDK">
+    ```typescript
+    import { createCrossmint } from "@crossmint/common-sdk-base";
+    import { CrossmintWallets } from "@crossmint/wallets-sdk";
+
+    const crossmint = createCrossmint({
+      apiKey: "YOUR_API_KEY",
+    });
+
+    const wallets = CrossmintWallets.from(crossmint);
+    ```
+  </Step>
+
+  <Step title="Create or get a wallet">
+    ```typescript
+    // Get or create a wallet for the authenticated user
+    const wallet = await wallets.getOrCreateWallet({
+      chain: "ethereum-sepolia",
+      signer: {
+        type: "api-key",
+        locator: "user-id-123", // Your user's identifier
+      },
+    });
+
+    console.log("Wallet address:", wallet.address);
+    console.log("Chain:", wallet.chain);
+    ```
+  </Step>
+
+  <Step title="Check the wallet balance">
+    ```typescript
+    const balances = await wallet.getBalance();
+
+    console.log("Native balance:", balances.native.raw);
+    console.log("Token balances:", balances.tokens);
+    ```
+  </Step>
+</Steps>
+
+## Creating Wallets
+
+### Client-Side Creation
+
+Create wallets in your frontend application:
+
+```typescript
+const wallet = await wallets.getOrCreateWallet({
+  chain: "ethereum-sepolia",
+  signer: {
+    type: "api-key",
+    locator: "user@example.com",
+  },
+});
+```
+
+### Server-Side Creation
+
+For more control, create wallets from your backend:
+
+```typescript
+// Backend code with server API key
+const wallet = await wallets.createWallet({
+  chain: "polygon-amoy",
+  signer: {
+    type: "api-key",
+    locator: `user:${userId}`,
+  },
+});
+
+// Return wallet address to frontend
+return { address: wallet.address };
+```
+
+<Tip>
+  Use `getOrCreateWallet()` to ensure you don't create duplicate wallets for the same user.
+</Tip>
+
+## Multi-Chain Wallets
+
+Create wallets on different chains for the same user:
+
+```typescript
+// EVM chains
+const ethWallet = await wallets.getOrCreateWallet({
+  chain: "ethereum-sepolia",
+  signer: { type: "api-key", locator: "user-123" },
+});
+
+const polygonWallet = await wallets.getOrCreateWallet({
+  chain: "polygon-amoy",
+  signer: { type: "api-key", locator: "user-123" },
+});
+
+// Solana
+const solanaWallet = await wallets.getOrCreateWallet({
+  chain: "solana-devnet",
+  signer: { type: "api-key", locator: "user-123" },
+});
+```
+
+<CardGroup cols={2}>
+  <Card title="EVM Chains" icon="ethereum">
+    Ethereum, Polygon, Base, Arbitrum, Optimism, and more
+  </Card>
+  <Card title="Solana" icon="link">
+    Solana mainnet and devnet support
+  </Card>
+</CardGroup>
+
+## Sending Transactions
+
+### EVM Transactions
+
+```typescript
+import { EVMWallet } from "@crossmint/wallets-sdk";
+
+const evmWallet = EVMWallet.from(wallet);
+
+const result = await evmWallet.sendTransaction({
+  to: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+  value: "0.01", // in ETH
+});
+
+console.log("Transaction hash:", result.hash);
+console.log("Explorer link:", result.explorerLink);
+```
+
+### Solana Transactions
+
+```typescript
+import { SolanaWallet } from "@crossmint/wallets-sdk";
+import { Transaction, SystemProgram, PublicKey } from "@solana/web3.js";
+
+const solanaWallet = SolanaWallet.from(wallet);
+
+// Create your transaction
+const transaction = new Transaction().add(
+  SystemProgram.transfer({
+    fromPubkey: new PublicKey(solanaWallet.address),
+    toPubkey: new PublicKey("recipient-address"),
+    lamports: 1000000, // 0.001 SOL
+  })
+);
+
+// Serialize and send
+const serialized = transaction.serialize().toString("base64");
+const result = await solanaWallet.sendTransaction({
+  serializedTransaction: serialized,
+});
+
+console.log("Transaction hash:", result.hash);
+```
+
+## Checking Balances
+
+Retrieve native and token balances:
+
+```typescript
+const balances = await wallet.getBalance();
+
+// Native currency (ETH, SOL, etc.)
+console.log("Native balance:", {
+  raw: balances.native.raw,
+  formatted: balances.native.formatted,
+  symbol: balances.native.symbol,
+});
+
+// Token balances
+for (const token of balances.tokens) {
+  console.log(`${token.symbol}: ${token.formatted}`);
+}
+```
+
+## Signing Messages
+
+Sign arbitrary messages for authentication or verification:
+
+```typescript
+// EVM message signing
+const evmWallet = EVMWallet.from(wallet);
+const signature = await evmWallet.signMessage({
+  message: "Sign this message to authenticate",
+});
+
+console.log("Signature:", signature.signature);
+```
+
+## Transaction History
+
+Retrieve transaction history for a wallet:
+
+```typescript
+const transactions = await wallet.getTransactions();
+
+for (const tx of transactions) {
+  console.log("Transaction ID:", tx.id);
+  console.log("Status:", tx.status);
+  console.log("Hash:", tx.onChain?.txId);
+  console.log("Explorer:", tx.onChain?.explorerLink);
+}
+```
+
+## Delegated Signers
+
+Allow third parties to sign transactions on behalf of a wallet:
+
+```typescript
+const result = await wallet.addDelegatedSigner({
+  signer: {
+    type: "api-key",
+    locator: "backend-service",
+  },
+});
+
+console.log("Delegated signer added:", result.signer);
+```
+
+<Warning>
+  Delegated signers have full control over the wallet. Only add trusted parties as delegated signers.
+</Warning>
+
+## Best Practices
+
+<Steps>
+  <Step title="Use meaningful locators">
+    Use consistent, meaningful identifiers for your users:
+    ```typescript
+    locator: `user:${userId}` // Good
+    locator: `${randomString}` // Bad
+    ```
+  </Step>
+
+  <Step title="Handle errors gracefully">
+    ```typescript
+    try {
+      const wallet = await wallets.getOrCreateWallet({
+        chain: "ethereum-sepolia",
+        signer: { type: "api-key", locator: userId },
+      });
+    } catch (error) {
+      console.error("Failed to create wallet:", error);
+      // Show user-friendly error message
+    }
+    ```
+  </Step>
+
+  <Step title="Cache wallet addresses">
+    Store wallet addresses in your database to avoid repeated API calls:
+    ```typescript
+    // First time
+    const wallet = await wallets.getOrCreateWallet({...});
+    await db.users.update(userId, { walletAddress: wallet.address });
+
+    // Later
+    const address = await db.users.get(userId).walletAddress;
+    ```
+  </Step>
+</Steps>
+
+## React Integration
+
+For React applications, use the UI SDK:
+
+```bash
+npm install @crossmint/client-sdk-react-ui
+```
+
+```tsx
+import { CrossmintProvider, useWallet } from "@crossmint/client-sdk-react-ui";
+
+function WalletInfo() {
+  const { wallet, isLoading } = useWallet();
+
+  if (isLoading) return <div>Loading wallet...</div>;
+
+  return (
+    <div>
+      <p>Address: {wallet?.address}</p>
+      <p>Chain: {wallet?.chain}</p>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <CrossmintProvider apiKey="YOUR_API_KEY">
+      <WalletInfo />
+    </CrossmintProvider>
+  );
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Custom Transactions" icon="code" href="/guides/custom-transactions">
+    Build and send custom blockchain transactions
+  </Card>
+  <Card title="Multi-Chain Support" icon="link" href="/guides/multi-chain-support">
+    Work with multiple blockchain networks
+  </Card>
+</CardGroup>

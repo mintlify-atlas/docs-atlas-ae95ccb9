@@ -1,0 +1,362 @@
+---
+title: "Stellar Wallets"
+description: "Work with Stellar wallets, smart contracts, and custom transactions"
+---
+
+## Overview
+
+The `StellarWallet` class extends the base `Wallet` with Stellar-specific functionality for:
+- Executing smart contract calls
+- Sending serialized transactions
+- Interacting with Soroban contracts
+- Managing Stellar-specific operations
+
+## Create a Stellar Wallet Instance
+
+Cast a base `Wallet` to `StellarWallet` for Stellar-specific operations:
+
+```typescript
+import { StellarWallet } from "@crossmint/wallets-sdk";
+
+// Assuming you have a wallet instance
+const stellarWallet = StellarWallet.from(wallet);
+```
+
+<Note>
+The `StellarWallet.from()` method will throw an error if the wallet is not on the Stellar chain.
+</Note>
+
+## Send Custom Transactions
+
+Execute custom Stellar transactions.
+
+### Method Signature
+
+```typescript
+stellarWallet.sendTransaction(params: StellarTransactionInput): Promise<Transaction>
+```
+
+### Contract Call
+
+Call a Soroban smart contract method:
+
+```typescript
+const tx = await stellarWallet.sendTransaction({
+    contractId: "C...", // Stellar contract ID
+    method: "transfer",
+    args: {
+        from: wallet.address,
+        to: "GRECIPIENT...",
+        amount: "1000000",
+    },
+    memo: "Transfer tokens", // Optional memo
+});
+
+console.log(tx.hash);         // Transaction hash
+console.log(tx.explorerLink); // Stellar explorer link
+```
+
+### Serialized Transaction
+
+Send a pre-built serialized transaction:
+
+```typescript
+const serializedTx = "base64-encoded-transaction...";
+
+const tx = await stellarWallet.sendTransaction({
+    transaction: serializedTx,
+    contractId: "C...", // Contract ID for the transaction
+});
+
+console.log(tx.hash);
+console.log(tx.explorerLink);
+```
+
+### Prepare-Only Mode
+
+Create a transaction without executing:
+
+```typescript
+const preparedTx = await stellarWallet.sendTransaction({
+    contractId: "C...",
+    method: "transfer",
+    args: { /* ... */ },
+    options: {
+        experimental_prepareOnly: true,
+    },
+});
+
+console.log(preparedTx.transactionId);
+
+// Approve later
+const completedTx = await wallet.approve({
+    transactionId: preparedTx.transactionId,
+});
+```
+
+### With Custom Signer
+
+```typescript
+const tx = await stellarWallet.sendTransaction({
+    contractId: "C...",
+    method: "mint",
+    args: { /* ... */ },
+    options: {
+        experimental_signer: "external-wallet:G...",
+    },
+});
+```
+
+### Parameters
+
+<ParamField path="contractId" type="string" required>
+  Stellar contract ID (starts with 'C')
+</ParamField>
+
+<ParamField path="method" type="string">
+  Contract method name to call
+</ParamField>
+
+<ParamField path="args" type="Record<string, any>">
+  Method arguments as key-value pairs
+</ParamField>
+
+<ParamField path="memo" type="string">
+  Optional transaction memo
+</ParamField>
+
+<ParamField path="transaction" type="string">
+  Serialized transaction (alternative to method/args)
+</ParamField>
+
+<ParamField path="options" type="TransactionInputOptions">
+  <Expandable title="properties">
+    <ParamField path="experimental_prepareOnly" type="boolean">
+      Create without executing
+    </ParamField>
+    <ParamField path="experimental_signer" type="string">
+      Custom signer locator
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Complete Example: Token Transfer
+
+Transfer tokens using a Soroban token contract:
+
+```typescript
+import { CrossmintWallets, createCrossmint, StellarWallet } from "@crossmint/wallets-sdk";
+
+// Initialize
+const crossmint = createCrossmint({ apiKey: "..." });
+const crossmintWallets = CrossmintWallets.from(crossmint);
+
+// Get wallet
+const wallet = await crossmintWallets.getOrCreateWallet({
+    chain: "stellar",
+    signer: {
+        type: "email",
+        email: "user@example.com",
+        onAuthRequired: async (needsAuth, sendEmailWithOtp, verifyOtp, reject) => {
+            if (needsAuth) {
+                await sendEmailWithOtp();
+                // Prompt user for OTP
+                const otp = await promptUserForOtp();
+                await verifyOtp(otp);
+            }
+        },
+    },
+});
+
+// Cast to Stellar wallet
+const stellarWallet = StellarWallet.from(wallet);
+
+// Transfer tokens via contract
+const tx = await stellarWallet.sendTransaction({
+    contractId: "CTOKEN123...", // Your token contract ID
+    method: "transfer",
+    args: {
+        from: wallet.address,
+        to: "GRECIPIENT...",
+        amount: "1000000", // Amount in smallest unit
+    },
+    memo: "Payment for services",
+});
+
+console.log(`Transfer complete! Transaction: ${tx.explorerLink}`);
+```
+
+## Complete Example: NFT Minting
+
+Mint an NFT using a Soroban NFT contract:
+
+```typescript
+import { CrossmintWallets, createCrossmint, StellarWallet } from "@crossmint/wallets-sdk";
+
+// Initialize and get wallet
+const crossmint = createCrossmint({ apiKey: "..." });
+const crossmintWallets = CrossmintWallets.from(crossmint);
+const wallet = await crossmintWallets.getOrCreateWallet({
+    chain: "stellar",
+    signer: { type: "email", email: "user@example.com", onAuthRequired: async (...) => {...} },
+});
+
+const stellarWallet = StellarWallet.from(wallet);
+
+// Mint NFT
+const tx = await stellarWallet.sendTransaction({
+    contractId: "CNFT123...", // Your NFT contract ID
+    method: "mint",
+    args: {
+        to: wallet.address,
+        token_id: "1",
+        metadata_uri: "ipfs://...",
+    },
+});
+
+console.log(`NFT minted! Transaction: ${tx.explorerLink}`);
+```
+
+## Complete Example: Custom Contract Interaction
+
+Interact with any Soroban smart contract:
+
+```typescript
+import { CrossmintWallets, createCrossmint, StellarWallet } from "@crossmint/wallets-sdk";
+
+// Initialize
+const crossmint = createCrossmint({ apiKey: "..." });
+const crossmintWallets = CrossmintWallets.from(crossmint);
+const wallet = await crossmintWallets.getOrCreateWallet({
+    chain: "stellar",
+    signer: { type: "email", email: "user@example.com", onAuthRequired: async (...) => {...} },
+});
+
+const stellarWallet = StellarWallet.from(wallet);
+
+// Call custom contract method
+const tx = await stellarWallet.sendTransaction({
+    contractId: "CCONTRACT...",
+    method: "custom_function",
+    args: {
+        user: wallet.address,
+        param1: "value1",
+        param2: 12345,
+        param3: true,
+    },
+    memo: "Custom contract interaction",
+});
+
+console.log(`Contract called! Transaction: ${tx.explorerLink}`);
+```
+
+## Working with External Wallets
+
+Connect Freighter or other Stellar wallets:
+
+```typescript
+import { CrossmintWallets, createCrossmint } from "@crossmint/wallets-sdk";
+
+// Assuming Freighter is installed
+const freighter = await import("@stellar/freighter-api");
+
+if (!freighter.isConnected()) {
+    throw new Error("Freighter wallet not found");
+}
+
+// Get Freighter address
+const freighterAddress = await freighter.getPublicKey();
+
+// Create wallet with Freighter as signer
+const crossmint = createCrossmint({ apiKey: "..." });
+const crossmintWallets = CrossmintWallets.from(crossmint);
+
+const wallet = await crossmintWallets.getOrCreateWallet({
+    chain: "stellar",
+    signer: {
+        type: "external-wallet",
+        address: freighterAddress,
+        onSignTransaction: async (transaction) => {
+            const signedTx = await freighter.signTransaction(transaction);
+            return signedTx;
+        },
+        onSignMessage: async (message) => {
+            const signature = await freighter.signMessage(message);
+            return { signature };
+        },
+    },
+});
+```
+
+## Using Simple Token Transfers
+
+For basic token transfers, use the base wallet's `send()` method:
+
+```typescript
+// Simple USDC transfer
+const tx = await wallet.send(
+    "GRECIPIENT...",
+    "usdc",
+    "100"
+);
+
+// Simple XLM transfer
+const tx = await wallet.send(
+    "GRECIPIENT...",
+    "xlm",
+    "50"
+);
+```
+
+See [Wallet Operations](/wallets-sdk/wallet-operations) for more details.
+
+## Balances with Stellar
+
+Get token balances including contract IDs:
+
+```typescript
+const balances = await wallet.balances();
+
+console.log(balances.nativeToken.amount);    // XLM balance
+console.log(balances.usdc.amount);           // USDC balance
+console.log(balances.usdc.contractId);       // USDC contract ID
+
+// Query additional tokens
+const extendedBalances = await wallet.balances([
+    "CTOKEN123...", // Custom token contract ID
+]);
+
+console.log(extendedBalances.tokens[0].contractId);
+```
+
+## Stellar Networks
+
+The SDK works with:
+- **Mainnet (Public)**: Production Stellar network
+- **Testnet**: Testing network with free XLM from faucets
+
+## Soroban Smart Contracts
+
+Soroban is Stellar's smart contract platform. Key concepts:
+
+- **Contract IDs**: Stellar contracts are identified by IDs starting with 'C'
+- **Method calls**: Invoke contract methods with typed arguments
+- **Memos**: Add optional text memos to transactions
+- **Asset contracts**: Many Stellar assets are implemented as Soroban contracts
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Wallet Operations" icon="list-check" href="/wallets-sdk/wallet-operations">
+    Learn about common wallet operations
+  </Card>
+  <Card title="Delegated Signers" icon="users" href="/wallets-sdk/delegated-signers">
+    Add multiple signers to a wallet
+  </Card>
+  <Card title="EVM Wallets" icon="ethereum" href="/wallets-sdk/evm-wallets">
+    Learn about EVM-specific operations
+  </Card>
+  <Card title="Solana Wallets" icon="circle" href="/wallets-sdk/solana-wallets">
+    Learn about Solana-specific operations
+  </Card>
+</CardGroup>

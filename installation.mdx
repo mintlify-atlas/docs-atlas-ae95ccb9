@@ -1,0 +1,493 @@
+---
+title: "Installation"
+description: "Install Crossmint SDK packages for your project"
+---
+
+## Overview
+
+Crossmint SDK is distributed as a collection of npm packages, allowing you to install only what you need for your specific use case. All packages are written in TypeScript and provide full type safety.
+
+<Note>
+  **Prerequisites**: Node.js 16+ and npm, yarn, or pnpm installed on your system.
+</Note>
+
+## Quick Install
+
+For most applications, you'll want to start with one of these core packages:
+
+<Tabs>
+  <Tab title="React Applications">
+    If you're building a React app with authentication and wallets:
+    
+    <CodeGroup>
+    ```bash npm
+    npm install @crossmint/client-sdk-react-ui
+    ```
+    
+    ```bash yarn
+    yarn add @crossmint/client-sdk-react-ui
+    ```
+    
+    ```bash pnpm
+    pnpm add @crossmint/client-sdk-react-ui
+    ```
+    </CodeGroup>
+    
+    <Tip>
+      This package includes providers, hooks, and UI components for authentication and wallet management.
+    </Tip>
+  </Tab>
+  
+  <Tab title="Vanilla TypeScript/JavaScript">
+    For programmatic wallet creation and management:
+    
+    <CodeGroup>
+    ```bash npm
+    npm install @crossmint/wallets-sdk
+    ```
+    
+    ```bash yarn
+    yarn add @crossmint/wallets-sdk
+    ```
+    
+    ```bash pnpm
+    pnpm add @crossmint/wallets-sdk
+    ```
+    </CodeGroup>
+    
+    <Tip>
+      Works in any JavaScript/TypeScript environment including Node.js and browser.
+    </Tip>
+  </Tab>
+  
+  <Tab title="Server-Side (SSR)">
+    For Next.js, Remix, or other SSR frameworks:
+    
+    <CodeGroup>
+    ```bash npm
+    npm install @crossmint/server-sdk
+    ```
+    
+    ```bash yarn
+    yarn add @crossmint/server-sdk
+    ```
+    
+    ```bash pnpm
+    pnpm add @crossmint/server-sdk
+    ```
+    </CodeGroup>
+    
+    <Tip>
+      Handles authentication with HttpOnly cookies for enhanced security.
+    </Tip>
+  </Tab>
+</Tabs>
+
+## All Packages
+
+Here's a complete list of available Crossmint SDK packages:
+
+### Wallets
+
+<Card title="@crossmint/wallets-sdk" icon="wallet">
+  **Core wallet functionality** for creating and managing multi-chain wallets programmatically.
+  
+  <CodeGroup>
+  ```bash npm
+  npm install @crossmint/wallets-sdk
+  ```
+  
+  ```bash yarn
+  yarn add @crossmint/wallets-sdk
+  ```
+  
+  ```bash pnpm
+  pnpm add @crossmint/wallets-sdk
+  ```
+  </CodeGroup>
+  
+  **Features:**
+  - Create wallets on Solana and 20+ EVM chains
+  - Check balances and send tokens
+  - Custom transaction support
+  - Delegated signers
+  - Wallet activity tracking
+  
+  **Use when:** Building wallet functionality in any JavaScript environment
+</Card>
+
+### Authentication
+
+<CardGroup cols={2}>
+  <Card title="@crossmint/client-sdk-auth" icon="lock">
+    **Client-side authentication** with multiple storage options.
+    
+    <CodeGroup>
+    ```bash npm
+    npm install @crossmint/client-sdk-auth
+    ```
+    
+    ```bash yarn
+    yarn add @crossmint/client-sdk-auth
+    ```
+    
+    ```bash pnpm
+    pnpm add @crossmint/client-sdk-auth
+    ```
+    </CodeGroup>
+    
+    **Features:**
+    - Browser cookie storage
+    - React Native secure storage
+    - Custom storage providers
+    - Token refresh handling
+    
+    **Use when:** Adding authentication to client-side applications
+  </Card>
+  
+  <Card title="@crossmint/server-sdk" icon="server">
+    **Server-side authentication** for SSR frameworks.
+    
+    <CodeGroup>
+    ```bash npm
+    npm install @crossmint/server-sdk
+    ```
+    
+    ```bash yarn
+    yarn add @crossmint/server-sdk
+    ```
+    
+    ```bash pnpm
+    pnpm add @crossmint/server-sdk
+    ```
+    </CodeGroup>
+    
+    **Features:**
+    - HttpOnly cookie support
+    - Next.js integration
+    - Custom refresh routes
+    - Session management
+    
+    **Use when:** Building server-rendered applications with authentication
+  </Card>
+</CardGroup>
+
+### React UI Components
+
+<CardGroup cols={2}>
+  <Card title="@crossmint/client-sdk-react-ui" icon="react">
+    **Complete React SDK** with providers, hooks, and UI components.
+    
+    <CodeGroup>
+    ```bash npm
+    npm install @crossmint/client-sdk-react-ui
+    ```
+    
+    ```bash yarn
+    yarn add @crossmint/client-sdk-react-ui
+    ```
+    
+    ```bash pnpm
+    pnpm add @crossmint/client-sdk-react-ui
+    ```
+    </CodeGroup>
+    
+    **Features:**
+    - Authentication providers and hooks
+    - Wallet providers and hooks
+    - Pre-built UI components
+    - NFT collection views
+    
+    **Use when:** Building React web applications
+    
+    **Peer Dependencies:**
+    ```json
+    {
+      "react": ">=17.0.2",
+      "react-dom": ">=17.0.2",
+      "@solana/web3.js": "^1.98.1"
+    }
+    ```
+  </Card>
+  
+  <Card title="@crossmint/client-sdk-react-native-ui" icon="mobile">
+    **React Native SDK** with native UI components.
+    
+    <CodeGroup>
+    ```bash npm
+    npm install @crossmint/client-sdk-react-native-ui
+    ```
+    
+    ```bash yarn
+    yarn add @crossmint/client-sdk-react-native-ui
+    ```
+    
+    ```bash pnpm
+    pnpm add @crossmint/client-sdk-react-native-ui
+    ```
+    </CodeGroup>
+    
+    **Features:**
+    - Native mobile components
+    - Expo SecureStore support
+    - React Native Encrypted Storage
+    - Same API as React UI
+    
+    **Use when:** Building React Native mobile applications
+  </Card>
+</CardGroup>
+
+### Verifiable Credentials
+
+<Card title="@crossmint/client-sdk-verifiable-credentials" icon="certificate">
+  **Verifiable credentials** for decentralized identity and attestations.
+  
+  <CodeGroup>
+  ```bash npm
+  npm install @crossmint/client-sdk-verifiable-credentials
+  ```
+  
+  ```bash yarn
+  yarn add @crossmint/client-sdk-verifiable-credentials
+  ```
+  
+  ```bash pnpm
+  pnpm add @crossmint/client-sdk-verifiable-credentials
+  ```
+  </CodeGroup>
+  
+  **Features:**
+  - Issue verifiable credentials
+  - Verify credentials
+  - Decentralized identity
+  - Privacy-preserving attestations
+  
+  **Use when:** Building identity or credential verification systems
+</Card>
+
+## Package Dependencies
+
+<Warning>
+  Some packages require peer dependencies to be installed. Make sure to install them based on your package manager's warnings.
+</Warning>
+
+### Common Peer Dependencies
+
+<AccordionGroup>
+  <Accordion title="React Packages" icon="react">
+    The React UI packages require:
+    
+    ```json
+    {
+      "react": ">=17.0.2",
+      "react-dom": ">=17.0.2"
+    }
+    ```
+    
+    <CodeGroup>
+    ```bash npm
+    npm install react react-dom
+    ```
+    
+    ```bash yarn
+    yarn add react react-dom
+    ```
+    
+    ```bash pnpm
+    pnpm add react react-dom
+    ```
+    </CodeGroup>
+  </Accordion>
+  
+  <Accordion title="Solana Support" icon="link">
+    For Solana wallet functionality:
+    
+    ```json
+    {
+      "@solana/web3.js": "^1.98.1"
+    }
+    ```
+    
+    <CodeGroup>
+    ```bash npm
+    npm install @solana/web3.js
+    ```
+    
+    ```bash yarn
+    yarn add @solana/web3.js
+    ```
+    
+    ```bash pnpm
+    pnpm add @solana/web3.js
+    ```
+    </CodeGroup>
+  </Accordion>
+  
+  <Accordion title="React Native Secure Storage" icon="shield">
+    For React Native with Expo:
+    
+    ```bash
+    npx expo install expo-secure-store
+    ```
+    
+    For vanilla React Native:
+    
+    ```bash
+    npm install react-native-encrypted-storage
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Version Compatibility
+
+<Info>
+  All Crossmint packages follow semantic versioning. We recommend keeping all packages on the same major version to ensure compatibility.
+</Info>
+
+| Package | Current Version | Node.js | TypeScript |
+|---------|----------------|---------|------------|
+| @crossmint/wallets-sdk | 0.19.0 | ≥16 | ≥4.5 |
+| @crossmint/server-sdk | 1.2.59 | ≥16 | ≥4.5 |
+| @crossmint/client-sdk-auth | 1.2.47 | ≥16 | ≥4.5 |
+| @crossmint/client-sdk-react-ui | 2.6.18 | ≥16 | ≥4.5 |
+| @crossmint/client-sdk-verifiable-credentials | 3.4.76 | ≥16 | ≥4.5 |
+
+## Environment Setup
+
+After installation, you'll need to configure your environment variables:
+
+<Steps>
+  <Step title="Get Your API Keys">
+    Sign up for a Crossmint account and navigate to the [API Keys page](https://www.crossmint.com/console/projects/apiKeys).
+    
+    You'll need:
+    - **Client API Key** - For client-side applications
+    - **Server API Key** - For server-side applications (keep this secret!)
+  </Step>
+  
+  <Step title="Create Environment File">
+    Create a `.env` or `.env.local` file in your project root:
+    
+    ```bash .env
+    # Client-side key (safe to expose in browser)
+    NEXT_PUBLIC_CROSSMINT_API_KEY=your_client_api_key
+    
+    # Server-side key (keep secret!)
+    SERVER_CROSSMINT_API_KEY=your_server_api_key
+    ```
+    
+    <Warning>
+      Never commit your `.env` file to version control. Add it to `.gitignore`.
+    </Warning>
+  </Step>
+  
+  <Step title="Configure API Scopes">
+    In the Crossmint console, ensure your API key has the necessary scopes:
+    - **Wallet API** - For wallet operations
+    - **Users** - For user authentication
+    
+    [Configure Scopes →](https://www.crossmint.com/console/projects/apiKeys)
+  </Step>
+</Steps>
+
+## TypeScript Configuration
+
+For optimal TypeScript support, ensure your `tsconfig.json` includes:
+
+```json tsconfig.json
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "skipLibCheck": true,
+    "esModuleInterop": true
+  }
+}
+```
+
+## Verification
+
+Verify your installation by importing a package:
+
+<CodeGroup>
+```typescript React
+import { CrossmintProvider } from "@crossmint/client-sdk-react-ui";
+
+console.log("Crossmint SDK loaded successfully!");
+```
+
+```typescript Node.js
+import { createCrossmint } from "@crossmint/wallets-sdk";
+
+const crossmint = createCrossmint({
+  apiKey: process.env.CROSSMINT_API_KEY || "",
+});
+
+console.log("Crossmint initialized!");
+```
+</CodeGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart Guide" icon="rocket" href="/quickstart">
+    Build your first wallet-enabled app in 5 minutes
+  </Card>
+  
+  <Card title="Wallets SDK Guide" icon="wallet" href="/wallets-sdk/overview">
+    Deep dive into wallet creation and management
+  </Card>
+  
+  <Card title="Authentication Guide" icon="lock" href="/concepts/authentication">
+    Set up authentication for your application
+  </Card>
+  
+  <Card title="React Components" icon="react" href="/client-sdk/react-ui">
+    Explore pre-built UI components
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Module not found errors" icon="exclamation-triangle">
+    If you see module resolution errors:
+    
+    1. Ensure peer dependencies are installed
+    2. Clear your package manager cache:
+       ```bash
+       npm cache clean --force
+       # or
+       yarn cache clean
+       # or
+       pnpm store prune
+       ```
+    3. Delete `node_modules` and reinstall:
+       ```bash
+       rm -rf node_modules package-lock.json
+       npm install
+       ```
+  </Accordion>
+  
+  <Accordion title="TypeScript errors" icon="code">
+    If you encounter TypeScript errors:
+    
+    1. Ensure TypeScript version is ≥4.5
+    2. Set `skipLibCheck: true` in `tsconfig.json`
+    3. Update `moduleResolution` to `"bundler"` or `"node16"`
+  </Accordion>
+  
+  <Accordion title="Build errors in Next.js" icon="triangle-exclamation">
+    For Next.js projects:
+    
+    1. Ensure you're using "use client" directive for client components
+    2. Configure `transpilePackages` in `next.config.js`:
+       ```javascript
+       module.exports = {
+         transpilePackages: ['@crossmint/client-sdk-react-ui'],
+       };
+       ```
+  </Accordion>
+</AccordionGroup>

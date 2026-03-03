@@ -1,0 +1,266 @@
+---
+title: Supported Chains
+description: Complete list of blockchain networks supported by Crossmint SDK
+---
+
+# Supported Chains
+
+Crossmint SDK supports multiple blockchain networks across EVM, Solana, and Stellar ecosystems. All EVM chains use **smart contract wallets** (ERC-4337 account abstraction) with built-in features like gas sponsorship and social recovery.
+
+## EVM Chains
+
+Ethereum Virtual Machine (EVM) compatible chains support smart wallet functionality.
+
+### Mainnet Chains
+
+<AccordionGroup>
+  <Accordion title="Production EVM Chains">
+    The following chains are available in production environments:
+
+    | Chain | Identifier | Network |
+    |-------|-----------|----------|
+    | **Abstract** | `abstract` | Abstract Mainnet |
+    | **ApeChain** | `apechain` | ApeChain Mainnet |
+    | **Arbitrum** | `arbitrum` | Arbitrum One |
+    | **Arbitrum Nova** | `arbitrumnova` | Arbitrum Nova |
+    | **Base** | `base` | Base Mainnet |
+    | **BNB Smart Chain** | `bsc` | BNB Chain |
+    | **Flow** | `flow` | Flow EVM Mainnet |
+    | **Mantle** | `mantle` | Mantle Mainnet |
+    | **Mode** | `mode` | Mode Mainnet |
+    | **Optimism** | `optimism` | Optimism Mainnet |
+    | **Plume** | `plume` | Plume Mainnet |
+    | **Polygon** | `polygon` | Polygon PoS |
+    | **Scroll** | `scroll` | Scroll Mainnet |
+    | **Sei** | `sei-pacific-1` | Sei Pacific-1 |
+    | **Shape** | `shape` | Shape Mainnet |
+    | **Story** | `story` | Story Mainnet |
+    | **World Chain** | `worldchain` | World Chain |
+    | **Zora** | `zora` | Zora Mainnet |
+
+    ```typescript
+    const wallet = await crossmint.wallets.get({
+      chain: "base", // Use any identifier from the table
+      signer: { type: "email", email: "user@example.com" }
+    });
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Testnet Chains
+
+<AccordionGroup>
+  <Accordion title="Testnet EVM Chains">
+    The following testnets are available for development:
+
+    | Chain | Identifier | Network |
+    |-------|-----------|----------|
+    | **Abstract Testnet** | `abstract-testnet` | Abstract Testnet |
+    | **Arc Testnet** | `arc-testnet` | Arc Testnet |
+    | **Arbitrum Sepolia** | `arbitrum-sepolia` | Arbitrum Sepolia |
+    | **Base Sepolia** | `base-sepolia` | Base Sepolia |
+    | **Curtis (ApeChain)** | `curtis` | Curtis Testnet |
+    | **Ethereum Sepolia** | `ethereum-sepolia` | Sepolia |
+    | **Flow Testnet** | `flow-testnet` | Flow EVM Testnet |
+    | **Mantle Sepolia** | `mantle-sepolia` | Mantle Sepolia |
+    | **Mode Sepolia** | `mode-sepolia` | Mode Sepolia |
+    | **Optimism Sepolia** | `optimism-sepolia` | Optimism Sepolia |
+    | **Plume Testnet** | `plume-testnet` | Plume Testnet |
+    | **Polygon Amoy** | `polygon-amoy` | Polygon Amoy |
+    | **Scroll Sepolia** | `scroll-sepolia` | Scroll Sepolia |
+    | **Sei Atlantic-2** | `sei-atlantic-2-testnet` | Sei Atlantic-2 |
+    | **Story Testnet** | `story-testnet` | Story Testnet |
+    | **Tempo Testnet** | `tempo-testnet` | Tempo Testnet |
+    | **World Chain Sepolia** | `world-chain-sepolia` | World Chain Sepolia |
+    | **Zora Sepolia** | `zora-sepolia` | Zora Sepolia |
+
+    ```typescript
+    const testWallet = await crossmint.wallets.get({
+      chain: "base-sepolia",
+      signer: { type: "email", email: "developer@example.com" }
+    });
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Chain Type Definitions
+
+From the source code (`packages/wallets/src/chains/chains.ts:73-75`):
+
+```typescript
+export type EVMSmartWalletTestnet = typeof TESTNET_AA_CHAINS[number];
+export type EVMSmartWalletMainnet = typeof PRODUCTION_AA_CHAINS[number];
+export type EVMSmartWalletChain = EVMSmartWalletTestnet | EVMSmartWalletMainnet;
+```
+
+## Solana
+
+Crossmint supports the Solana blockchain with native Solana wallet functionality.
+
+```typescript
+const solanaWallet = await crossmint.wallets.get({
+  chain: "solana",
+  signer: {
+    type: "email",
+    email: "user@example.com"
+  }
+});
+
+import { SolanaWallet } from "@crossmint/client-sdk-wallets";
+const wallet = SolanaWallet.from(solanaWallet);
+```
+
+Type definition (`packages/wallets/src/chains/chains.ts:147`):
+
+```typescript
+export type SolanaChain = "solana";
+```
+
+## Stellar
+
+Crossmint supports the Stellar network with native Stellar wallet functionality.
+
+```typescript
+const stellarWallet = await crossmint.wallets.get({
+  chain: "stellar",
+  signer: {
+    type: "email",
+    email: "user@example.com"
+  }
+});
+
+import { StellarWallet } from "@crossmint/client-sdk-wallets";
+const wallet = StellarWallet.from(stellarWallet);
+```
+
+Type definition (`packages/wallets/src/chains/chains.ts:148`):
+
+```typescript
+export type StellarChain = "stellar";
+```
+
+## Chain Utilities
+
+### Check Chain Type
+
+```typescript
+import { isTestnetChain, isMainnetChain } from "@crossmint/client-sdk-wallets";
+
+if (isTestnetChain("base-sepolia")) {
+  console.log("This is a testnet");
+}
+
+if (isMainnetChain("base")) {
+  console.log("This is mainnet");
+}
+```
+
+### Convert to Viem Chain
+
+For EVM chains, convert to Viem chain configuration:
+
+```typescript
+import { toViemChain } from "@crossmint/client-sdk-wallets";
+import { createPublicClient, http } from "viem";
+
+const viemChain = toViemChain("base");
+
+const publicClient = createPublicClient({
+  chain: viemChain,
+  transport: http()
+});
+```
+
+### Map Mainnet to Testnet
+
+```typescript
+import { mainnetToTestnet } from "@crossmint/client-sdk-wallets";
+
+const testnet = mainnetToTestnet("base");
+console.log(testnet); // "base-sepolia"
+
+const testnet2 = mainnetToTestnet("polygon");
+console.log(testnet2); // "polygon-amoy"
+```
+
+<Note>
+Not all mainnet chains have a corresponding testnet. The function returns `undefined` if no testnet mapping exists.
+</Note>
+
+## Multi-Chain Wallets
+
+<Info>
+For EVM chains, **a single wallet address works across all EVM networks**. You don't need separate wallets for each chain.
+</Info>
+
+```typescript
+// Same address on all EVM chains
+const baseWallet = await crossmint.wallets.get({
+  chain: "base",
+  signer: { type: "email", email: "user@example.com" }
+});
+
+const polygonWallet = await crossmint.wallets.get({
+  chain: "polygon",
+  signer: { type: "email", email: "user@example.com" }
+});
+
+console.log(baseWallet.address === polygonWallet.address); // true
+```
+
+However, Solana and Stellar use separate addresses:
+
+```typescript
+const evmWallet = await crossmint.wallets.get({
+  chain: "base",
+  signer: { type: "email", email: "user@example.com" }
+});
+
+const solanaWallet = await crossmint.wallets.get({
+  chain: "solana",
+  signer: { type: "email", email: "user@example.com" }
+});
+
+console.log(evmWallet.address === solanaWallet.address); // false
+```
+
+## Chain-Specific Features
+
+### EVM Smart Wallets
+
+- **Account Abstraction (ERC-4337)**: Smart contract wallets with advanced features
+- **Gas Sponsorship**: Pay gas fees for your users
+- **Batched Transactions**: Execute multiple operations in one transaction
+- **Social Recovery**: Recover wallets without seed phrases
+- **Delegated Signers**: Multi-sig functionality
+
+### Solana Wallets
+
+- **Native Solana Support**: Full Solana transaction support
+- **Versioned Transactions**: Support for v0 transactions
+- **Additional Signers**: Add keypair signers for complex transactions
+
+### Stellar Wallets
+
+- **Smart Contract Support**: Interact with Soroban smart contracts
+- **Asset Management**: Native support for Stellar assets
+
+## Type Definitions
+
+Complete chain type from source code (`packages/wallets/src/chains/chains.ts:151`):
+
+```typescript
+export type Chain = SolanaChain | EVMChain | StellarChain;
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Create Wallets" href="/concepts/wallets" icon="wallet">
+    Learn how to create and manage wallets on supported chains
+  </Card>
+  
+  <Card title="Configure Signers" href="/concepts/signers" icon="key">
+    Set up authentication methods for wallet access
+  </Card>
+</CardGroup>

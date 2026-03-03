@@ -1,0 +1,397 @@
+---
+title: Next.js Integration
+description: Complete guide to integrating Crossmint authentication and wallets in Next.js applications
+---
+
+# Next.js Integration
+
+This guide demonstrates how to integrate Crossmint Auth and Wallets in a Next.js application using the App Router with server-side rendering.
+
+## Demo Repository
+
+<Card title="Next.js SSR Demo" icon="github" href="https://github.com/Crossmint/crossmint-sdk/tree/main/apps/auth/nextjs-ssr">
+  Complete working example with authentication and wallet integration
+</Card>
+
+## Project Structure
+
+```
+app/
+├── api/
+│   ├── refresh/
+│   │   └── route.ts       # Token refresh endpoint
+│   └── logout/
+│       └── route.ts       # Logout endpoint
+├── components/
+│   └── Login.tsx          # Login component
+├── providers/
+│   └── CrossmintProviders.tsx
+├── hooks/
+│   └── auth.ts            # Auth helper functions
+├── middleware.ts          # Auth middleware
+└── page.tsx              # Home page
+```
+
+## Installation
+
+```bash
+npm install @crossmint/client-sdk-react-ui @crossmint/server-sdk
+```
+
+## Environment Variables
+
+Create a `.env.local` file:
+
+```bash
+# Client-side API key
+NEXT_PUBLIC_CLIENT_CROSSMINT_API_KEY=your_client_api_key
+
+# Server-side API key
+SERVER_CROSSMINT_API_KEY=your_server_api_key
+
+# Application URL
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+```
+
+<Note>
+  Get your API keys from the [Crossmint Console](https://console.crossmint.com/). You need both client-side and server-side keys.
+</Note>
+
+## Setup Providers
+
+Create a providers component to wrap your application:
+
+<CodeGroup>
+
+```tsx app/providers/CrossmintProviders.tsx
+"use client";
+
+import type { ReactNode } from "react";
+import { CrossmintProvider, CrossmintAuthProvider } from "@crossmint/client-sdk-react-ui";
+
+export default function CrossmintProviders({ children }: { children: ReactNode }) {
+    return (
+        <CrossmintProvider apiKey={process.env.NEXT_PUBLIC_CLIENT_CROSSMINT_API_KEY ?? ""}>
+            <CrossmintAuthProvider
+                loginMethods={["email", "google"]} // Configure login methods
+                refreshRoute="/api/refresh"
+                logoutRoute="/api/logout"
+            >
+                {children}
+            </CrossmintAuthProvider>
+        </CrossmintProvider>
+    );
+}
+```
+
+</CodeGroup>
+
+## Create API Routes
+
+### Refresh Token Route
+
+<CodeGroup>
+
+```ts app/api/refresh/route.ts
+import { createCrossmint, CrossmintAuth } from "@crossmint/server-sdk";
+import type { NextRequest } from "next/server";
+
+export async function POST(request: NextRequest) {
+    try {
+        const crossmint = createCrossmint({
+            apiKey: process.env.SERVER_CROSSMINT_API_KEY || "",
+        });
+        const crossmintAuth = CrossmintAuth.from(crossmint, {
+            cookieOptions: {
+                httpOnly: true,
+            },
+        });
+        const response = await crossmintAuth.handleCustomRefresh(request);
+
+        return response as Response;
+    } catch (error) {
+        console.error(error);
+    }
+}
+```
+
+</CodeGroup>
+
+### Logout Route
+
+<CodeGroup>
+
+```ts app/api/logout/route.ts
+import { createCrossmint, CrossmintAuth } from "@crossmint/server-sdk";
+import type { NextRequest } from "next/server";
+
+export async function POST(request: NextRequest) {
+    try {
+        const crossmint = createCrossmint({
+            apiKey: process.env.SERVER_CROSSMINT_API_KEY || "",
+        });
+        const crossmintAuth = CrossmintAuth.from(crossmint);
+        const response = await crossmintAuth.logout(request);
+
+        return response as Response;
+    } catch (error) {
+        console.error(error);
+    }
+}
+```
+
+</CodeGroup>
+
+## Authentication Helpers
+
+Create a helper function to get the auth session server-side:
+
+<CodeGroup>
+
+```ts hooks/auth.ts
+import { cookies } from "next/headers";
+import { createCrossmint, CrossmintAuth } from "@crossmint/server-sdk";
+
+export async function getAuthSession(refreshRoute?: string) {
+    const cookieStore = await cookies();
+    const jwt = cookieStore.get("crossmint-jwt")?.value;
+    const refreshToken = cookieStore.get("crossmint-refresh-token")?.value;
+
+    if (!refreshToken) {
+        return;
+    }
+
+    try {
+        const crossmint = createCrossmint({
+            apiKey: process.env.SERVER_CROSSMINT_API_KEY || "",
+        });
+        const crossmintAuth = CrossmintAuth.from(crossmint, {
+            refreshRoute,
+        });
+
+        const session = await crossmintAuth.getSession({
+            jwt,
+            refreshToken,
+        });
+        return session;
+    } catch (_) {
+        return;
+    }
+}
+```
+
+</CodeGroup>
+
+## Login Component
+
+Create a client component for authentication:
+
+<CodeGroup>
+
+```tsx components/Login.tsx
+"use client";
+
+import { useState } from "react";
+import { useAuth } from "@crossmint/client-sdk-react-ui";
+import { useRouter } from "next/navigation";
+
+export default function Login() {
+    const router = useRouter();
+    const { login, logout, user, status } = useAuth();
+    const [isLoading, setIsLoading] = useState(false);
+
+    const handleLogin = async () => {
+        setIsLoading(true);
+        try {
+            await login();
+            router.refresh();
+        } catch (error) {
+            console.error("Login failed:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleLogout = async () => {
+        setIsLoading(true);
+        try {
+            await logout();
+            router.refresh();
+        } catch (error) {
+            console.error("Logout failed:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    return (
+        <div className="flex flex-col items-center gap-4">
+            {status === "logged-in" ? (
+                <>
+                    <p>Welcome, User ID: {user?.id}</p>
+                    <button
+                        onClick={handleLogout}
+                        disabled={isLoading}
+                        className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 disabled:opacity-50"
+                    >
+                        {isLoading ? "Logging out..." : "Logout"}
+                    </button>
+                </>
+            ) : (
+                <button
+                    onClick={handleLogin}
+                    disabled={isLoading}
+                    className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+                >
+                    {isLoading ? "Logging in..." : "Login with Crossmint"}
+                </button>
+            )}
+        </div>
+    );
+}
+```
+
+</CodeGroup>
+
+## Main Page
+
+Implement server-side authentication in your page:
+
+<CodeGroup>
+
+```tsx app/page.tsx
+import CrossmintProviders from "@/providers/CrossmintProviders";
+import Login from "@/components/Login";
+import { getAuthSession } from "@/hooks/auth";
+
+export default async function Home() {
+    const refreshRoute = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/refresh`;
+    const session = await getAuthSession(refreshRoute);
+    const userId = session?.userId;
+
+    return (
+        <div className="min-h-screen p-8">
+            <main className="flex flex-col gap-8 items-center">
+                <h1 className="text-2xl font-bold">
+                    Welcome to Crossmint Auth Next.js Demo
+                </h1>
+                {userId ? (
+                    <div>
+                        <p>You are logged in!</p>
+                        <p>Your user ID is: {userId}</p>
+                    </div>
+                ) : null}
+
+                <CrossmintProviders>
+                    <Login />
+                </CrossmintProviders>
+            </main>
+        </div>
+    );
+}
+```
+
+</CodeGroup>
+
+## Middleware (Optional)
+
+Add middleware for protected routes:
+
+<CodeGroup>
+
+```ts middleware.ts
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { createCrossmint, CrossmintAuth } from "@crossmint/server-sdk";
+
+// Only run middleware on specific routes
+export const config = {
+    matcher: "/protected/:path*",
+    runtime: "nodejs",
+};
+
+export async function middleware(request: NextRequest) {
+    // Skip middleware for API routes and static files
+    if (request.nextUrl.pathname.startsWith("/api") || request.nextUrl.pathname.startsWith("/_next")) {
+        return NextResponse.next();
+    }
+
+    const response = NextResponse.next();
+
+    const jwt = request.cookies.get("crossmint-jwt")?.value;
+    const refreshToken = request.cookies.get("crossmint-refresh-token")?.value;
+
+    if (!refreshToken) {
+        return response;
+    }
+
+    try {
+        const crossmint = createCrossmint({
+            apiKey: process.env.SERVER_CROSSMINT_API_KEY || "",
+        });
+        const crossmintAuth = CrossmintAuth.from(crossmint);
+
+        const { jwt: newJwt, refreshToken: newRefreshToken } = await crossmintAuth.getSession({
+            jwt,
+            refreshToken,
+        });
+
+        // Only update response cookies if tokens have changed
+        if (newJwt !== jwt || newRefreshToken.secret !== refreshToken) {
+            response.cookies.set("crossmint-jwt", newJwt);
+            response.cookies.set("crossmint-refresh-token", newRefreshToken.secret);
+        }
+    } catch (_) {
+        // If auth fails, clear cookies and redirect to home
+        response.cookies.delete("crossmint-jwt");
+        response.cookies.delete("crossmint-refresh-token");
+    }
+
+    return response;
+}
+```
+
+</CodeGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Add Wallets" icon="wallet" href="/examples/wallet-creation">
+    Learn how to create and manage wallets
+  </Card>
+  <Card title="Server-Side Auth" icon="server" href="/examples/server-side-auth">
+    Implement server-side authentication
+  </Card>
+  <Card title="React Native" icon="mobile" href="/examples/react-native-integration">
+    Build mobile apps with Crossmint
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/client/react/providers">
+    Explore the full API
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Authentication not working">
+    - Verify your API keys are correct
+    - Check that you're using the right environment (staging vs production)
+    - Ensure cookies are being set correctly (check browser dev tools)
+  </Accordion>
+  
+  <Accordion title="CORS errors">
+    Make sure your domain is whitelisted in the Crossmint Console under your project settings.
+  </Accordion>
+  
+  <Accordion title="Token refresh issues">
+    - Verify the refresh route is configured correctly
+    - Check that httpOnly cookies are enabled in production
+    - Ensure the refresh endpoint is accessible
+  </Accordion>
+</AccordionGroup>
+
+## Related Resources
+
+- [Authentication Guide](/concepts/authentication)
+- [useAuth Hook](/api/client-sdk/react-hooks)
+- [Server SDK Reference](/server-sdk/authentication)

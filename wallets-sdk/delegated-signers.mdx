@@ -1,0 +1,386 @@
+---
+title: "Delegated Signers"
+description: "Add and manage multiple signers for smart wallets"
+---
+
+## Overview
+
+Delegated signers allow you to add additional signers to a smart wallet, enabling:
+- Multi-signature wallets
+- Session keys for games and applications
+- Hardware wallet integration
+- Passkey-based co-signers
+- Custodial and non-custodial hybrid setups
+
+## Add a Delegated Signer
+
+Add a new signer to an existing wallet.
+
+### Method Signature
+
+```typescript
+wallet.addDelegatedSigner(params: {
+    signer: string | RegisterSignerPasskeyParams;
+    options?: AddDelegatedSignerOptions;
+}): Promise<void>
+```
+
+### Add Address Signer
+
+Add an external wallet address as a delegated signer:
+
+```typescript
+await wallet.addDelegatedSigner({
+    signer: "0x1234567890abcdef1234567890abcdef12345678", // EVM address
+});
+
+// Or for Solana
+await wallet.addDelegatedSigner({
+    signer: "SolanaPublicKeyAddress...",
+});
+
+// Or for Stellar
+await wallet.addDelegatedSigner({
+    signer: "GStellarAddress...",
+});
+```
+
+### Add Passkey Signer (EVM only)
+
+Add a WebAuthn/FIDO2 passkey as a delegated signer:
+
+```typescript
+await wallet.addDelegatedSigner({
+    signer: {
+        publicKey: {
+            x: "0x...", // X coordinate of passkey public key
+            y: "0x...", // Y coordinate of passkey public key
+        },
+    },
+});
+```
+
+### Prepare-Only Mode
+
+Create the signer registration without immediately executing:
+
+```typescript
+const result = await wallet.addDelegatedSigner({
+    signer: "0x...",
+    options: {
+        experimental_prepareOnly: true,
+    },
+});
+
+// On Solana/Stellar, this returns a transactionId
+if ('transactionId' in result) {
+    console.log(result.transactionId);
+    await wallet.approve({ transactionId: result.transactionId });
+}
+
+// On EVM chains, this returns a signatureId (or undefined if no approval needed)
+if ('signatureId' in result && result.signatureId) {
+    console.log(result.signatureId);
+    await wallet.approve({ signatureId: result.signatureId });
+}
+```
+
+### Parameters
+
+<ParamField path="signer" type="string | RegisterSignerPasskeyParams" required>
+  The signer to add
+  
+  <Expandable title="RegisterSignerPasskeyParams">
+    ```typescript
+    {
+        publicKey: {
+            x: string; // Hex-encoded X coordinate
+            y: string; // Hex-encoded Y coordinate
+        }
+    }
+    ```
+  </Expandable>
+</ParamField>
+
+<ParamField path="options" type="AddDelegatedSignerOptions">
+  <Expandable title="properties">
+    <ParamField path="experimental_prepareOnly" type="boolean">
+      If true, returns transaction/signature ID without executing
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## List Delegated Signers
+
+Retrieve all delegated signers for a wallet.
+
+### Method Signature
+
+```typescript
+wallet.delegatedSigners(): Promise<DelegatedSigner[]>
+```
+
+### Usage
+
+```typescript
+const signers = await wallet.delegatedSigners();
+
+signers.forEach(signer => {
+    console.log(signer.signer); // e.g., "external-wallet:0x..."
+});
+```
+
+### Response Type
+
+<ParamField path="signer" type="string">
+  The signer locator in format `external-wallet:address`
+</ParamField>
+
+## Complete Example: EVM Multi-Sig
+
+Create a wallet with multiple EVM signers:
+
+```typescript
+import { CrossmintWallets, createCrossmint } from "@crossmint/wallets-sdk";
+
+// Initialize
+const crossmint = createCrossmint({ apiKey: "..." });
+const crossmintWallets = CrossmintWallets.from(crossmint);
+
+// Create primary wallet
+const wallet = await crossmintWallets.getOrCreateWallet({
+    chain: "polygon",
+    signer: {
+        type: "email",
+        email: "owner@example.com",
+        onAuthRequired: async (needsAuth, sendEmailWithOtp, verifyOtp, reject) => {
+            if (needsAuth) {
+                await sendEmailWithOtp();
+                const otp = await promptUserForOtp();
+                await verifyOtp(otp);
+            }
+        },
+    },
+});
+
+console.log(`Wallet created: ${wallet.address}`);
+
+// Add a hardware wallet as co-signer
+await wallet.addDelegatedSigner({
+    signer: "0xHardwareWalletAddress...",
+});
+
+// Add a passkey as co-signer
+await wallet.addDelegatedSigner({
+    signer: {
+        publicKey: {
+            x: "0x...",
+            y: "0x...",
+        },
+    },
+});
+
+// List all signers
+const signers = await wallet.delegatedSigners();
+console.log(`Total signers: ${signers.length}`);
+signers.forEach(s => console.log(s.signer));
+```
+
+## Complete Example: Solana Session Key
+
+Add a session key for game or dApp usage:
+
+```typescript
+import { CrossmintWallets, createCrossmint } from "@crossmint/wallets-sdk";
+import { Keypair } from "@solana/web3.js";
+
+// Initialize
+const crossmint = createCrossmint({ apiKey: "..." });
+const crossmintWallets = CrossmintWallets.from(crossmint);
+
+// Create primary wallet
+const wallet = await crossmintWallets.getOrCreateWallet({
+    chain: "solana",
+    signer: {
+        type: "email",
+        email: "player@example.com",
+        onAuthRequired: async (needsAuth, sendEmailWithOtp, verifyOtp, reject) => {
+            if (needsAuth) {
+                await sendEmailWithOtp();
+                const otp = await promptUserForOtp();
+                await verifyOtp(otp);
+            }
+        },
+    },
+});
+
+// Generate a session keypair (could be stored locally)
+const sessionKey = Keypair.generate();
+
+// Add session key as delegated signer
+await wallet.addDelegatedSigner({
+    signer: sessionKey.publicKey.toString(),
+});
+
+console.log(`Session key added: ${sessionKey.publicKey.toString()}`);
+
+// Now the session key can sign transactions for this wallet
+// Store the session keypair securely in local storage or session storage
+```
+
+## Complete Example: Stellar Multi-Signer
+
+Create a Stellar wallet with multiple signers:
+
+```typescript
+import { CrossmintWallets, createCrossmint } from "@crossmint/wallets-sdk";
+
+// Initialize
+const crossmint = createCrossmint({ apiKey: "..." });
+const crossmintWallets = CrossmintWallets.from(crossmint);
+
+// Create primary wallet
+const wallet = await crossmintWallets.getOrCreateWallet({
+    chain: "stellar",
+    signer: {
+        type: "email",
+        email: "primary@example.com",
+        onAuthRequired: async (needsAuth, sendEmailWithOtp, verifyOtp, reject) => {
+            if (needsAuth) {
+                await sendEmailWithOtp();
+                const otp = await promptUserForOtp();
+                await verifyOtp(otp);
+            }
+        },
+    },
+});
+
+// Add additional Stellar address as co-signer
+await wallet.addDelegatedSigner({
+    signer: "GBACKUPADDRESS...",
+});
+
+// List signers
+const signers = await wallet.delegatedSigners();
+console.log(`Total signers: ${signers.length}`);
+```
+
+## Use Cases
+
+### Multi-Signature Wallets
+
+Create wallets requiring multiple approvals:
+
+```typescript
+// Primary email signer
+const wallet = await crossmintWallets.getOrCreateWallet({
+    chain: "polygon",
+    signer: { type: "email", email: "owner@example.com", onAuthRequired: async (...) => {...} },
+});
+
+// Add co-signers
+await wallet.addDelegatedSigner({ signer: "0xCoSigner1..." });
+await wallet.addDelegatedSigner({ signer: "0xCoSigner2..." });
+```
+
+### Session Keys for Games
+
+Allow temporary signing permissions:
+
+```typescript
+// Main wallet
+const wallet = await crossmintWallets.getOrCreateWallet({
+    chain: "solana",
+    signer: { type: "email", email: "player@example.com", onAuthRequired: async (...) => {...} },
+});
+
+// Generate and add session key
+const sessionKey = Keypair.generate();
+await wallet.addDelegatedSigner({ signer: sessionKey.publicKey.toString() });
+
+// Session key can now sign game transactions
+```
+
+### Hardware Wallet Integration
+
+Combine custodial and non-custodial security:
+
+```typescript
+// Email-based wallet for convenience
+const wallet = await crossmintWallets.getOrCreateWallet({
+    chain: "ethereum",
+    signer: { type: "email", email: "user@example.com", onAuthRequired: async (...) => {...} },
+});
+
+// Add Ledger/Trezor as co-signer for high-value transactions
+await wallet.addDelegatedSigner({ signer: "0xLedgerAddress..." });
+```
+
+### Passkey Co-Signing
+
+Add biometric authentication (EVM only):
+
+```typescript
+const wallet = await crossmintWallets.getOrCreateWallet({
+    chain: "base",
+    signer: { type: "email", email: "user@example.com", onAuthRequired: async (...) => {...} },
+});
+
+// Add WebAuthn passkey
+await wallet.addDelegatedSigner({
+    signer: {
+        publicKey: { x: "0x...", y: "0x..." },
+    },
+});
+```
+
+## Chain-Specific Behavior
+
+### EVM Chains
+
+- Delegated signers are managed through ERC-4337 smart account infrastructure
+- Adding a signer may require signature approval
+- Passkeys (WebAuthn) are supported as delegated signers
+- Returns `signatureId` in prepare-only mode (or undefined if no approval needed)
+
+### Solana
+
+- Delegated signers are added via on-chain transaction
+- Adding a signer requires transaction approval
+- Returns `transactionId` in prepare-only mode
+- Session keys are commonly used for games and dApps
+
+### Stellar
+
+- Delegated signers modify the account's signer list
+- Adding a signer requires transaction approval
+- Returns `transactionId` in prepare-only mode
+- Multi-sig is native to Stellar protocol
+
+## Security Considerations
+
+<Warning>
+Delegated signers have full signing authority over the wallet. Only add trusted addresses.
+</Warning>
+
+- **Verify addresses**: Double-check signer addresses before adding
+- **Session key rotation**: Regularly rotate session keys used in applications
+- **Revocation**: Currently, signers cannot be removed via the SDK (use chain-native tools)
+- **Passkey storage**: Passkey private keys are stored in secure enclaves (TPM, Secure Enclave)
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Wallet Operations" icon="list-check" href="/wallets-sdk/wallet-operations">
+    Learn about common wallet operations
+  </Card>
+  <Card title="EVM Wallets" icon="ethereum" href="/wallets-sdk/evm-wallets">
+    EVM-specific features and passkeys
+  </Card>
+  <Card title="Solana Wallets" icon="circle" href="/wallets-sdk/solana-wallets">
+    Session keys for Solana applications
+  </Card>
+  <Card title="Stellar Wallets" icon="star" href="/wallets-sdk/stellar-wallets">
+    Multi-sig on Stellar
+  </Card>
+</CardGroup>

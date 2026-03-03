@@ -1,0 +1,353 @@
+---
+title: CrossmintAuthClient
+description: Client-side authentication SDK for managing user sessions and authentication flows
+---
+
+## Overview
+
+The `CrossmintAuthClient` class provides client-side authentication functionality including OAuth, email OTP, Farcaster, and smart wallet authentication. It handles token management, automatic refresh, and secure storage of authentication credentials.
+
+## Installation
+
+```bash
+npm install @crossmint/client-sdk-auth
+```
+
+## Creating an Instance
+
+```typescript
+import { CrossmintAuthClient } from '@crossmint/client-sdk-auth';
+import { Crossmint } from '@crossmint/common-sdk-base';
+
+const crossmint = new Crossmint({ apiKey: 'your-api-key' });
+
+const authClient = CrossmintAuthClient.from(crossmint, {
+  callbacks: {
+    onTokenRefresh: (authMaterial) => console.log('Token refreshed'),
+    onLogout: () => console.log('User logged out')
+  },
+  logoutRoute: '/api/auth/logout',
+  refreshRoute: '/api/auth/refresh'
+});
+```
+
+## Configuration
+
+<ParamField path="config" type="CrossmintAuthClientConfig">
+  Configuration object for the auth client
+  
+  <Expandable title="properties">
+    <ParamField path="callbacks" type="object" optional>
+      Lifecycle callbacks for authentication events
+      
+      <Expandable title="properties">
+        <ParamField path="onTokenRefresh" type="(authMaterial: AuthMaterialWithUser) => void" optional>
+          Called when the JWT is refreshed
+        </ParamField>
+        <ParamField path="onLogout" type="() => void" optional>
+          Called when the user logs out
+        </ParamField>
+      </Expandable>
+    </ParamField>
+    
+    <ParamField path="logoutRoute" type="string" optional>
+      Custom server endpoint for handling logout. If not provided, uses default Crossmint logout endpoint.
+    </ParamField>
+    
+    <ParamField path="refreshRoute" type="string" optional>
+      Custom server endpoint for refreshing tokens. If not provided, uses default Crossmint refresh endpoint.
+    </ParamField>
+    
+    <ParamField path="storageProvider" type="StorageProvider" optional>
+      Custom storage provider for tokens. Defaults to browser cookies/localStorage.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Methods
+
+### getUser
+
+Retrieves the currently authenticated user's information.
+
+```typescript
+const user = await authClient.getUser();
+console.log(user.email, user.id);
+```
+
+**Returns:** `Promise<User>`
+
+**Throws:** `CrossmintAuthenticationError` if the user is not authenticated or request fails
+
+---
+
+### getOAuthUrl
+
+Generates an OAuth URL for the specified provider.
+
+```typescript
+const oauthUrl = await authClient.getOAuthUrl('google', {
+  appSchema: 'myapp://'
+});
+window.location.href = oauthUrl;
+```
+
+<ParamField path="provider" type="OAuthProvider" required>
+  OAuth provider: `'google'`, `'twitter'`, `'facebook'`, etc.
+</ParamField>
+
+<ParamField path="options" type="object" optional>
+  <Expandable title="properties">
+    <ParamField path="appSchema" type="string" optional>
+      Custom app schema for mobile deep linking
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+**Returns:** `Promise<string>` - The OAuth authorization URL
+
+**Throws:** `CrossmintAuthenticationError` if the origin is unauthorized or request fails
+
+---
+
+### sendEmailOtp
+
+Sends a one-time password to the specified email address.
+
+```typescript
+const result = await authClient.sendEmailOtp('user@example.com');
+console.log('Email ID:', result.emailId);
+```
+
+<ParamField path="email" type="string" required>
+  Email address to send the OTP to
+</ParamField>
+
+**Returns:** `Promise<{ emailId: string }>` - Contains the email ID needed for confirmation
+
+**Throws:** `CrossmintAuthenticationError` if sending fails
+
+---
+
+### confirmEmailOtp
+
+Confirms an email OTP and completes authentication.
+
+```typescript
+const oneTimeSecret = await authClient.confirmEmailOtp(
+  'user@example.com',
+  emailId,
+  '123456'
+);
+```
+
+<ParamField path="email" type="string" required>
+  Email address that received the OTP
+</ParamField>
+
+<ParamField path="emailId" type="string" required>
+  Email ID returned from `sendEmailOtp`
+</ParamField>
+
+<ParamField path="token" type="string" required>
+  The 6-digit OTP code
+</ParamField>
+
+**Returns:** `Promise<string>` - One-time secret for completing authentication
+
+**Throws:** `CrossmintAuthenticationError` if verification fails
+
+---
+
+### signInWithFarcaster
+
+Authenticates a user using Farcaster.
+
+```typescript
+import { useSignIn } from '@farcaster/auth-kit';
+
+const { signIn, data } = useSignIn();
+await signIn();
+
+if (data) {
+  const oneTimeSecret = await authClient.signInWithFarcaster(data);
+}
+```
+
+<ParamField path="data" type="UseSignInData" required>
+  Farcaster sign-in data from `@farcaster/auth-kit`
+</ParamField>
+
+**Returns:** `Promise<string>` - One-time secret for completing authentication
+
+**Throws:** `CrossmintAuthenticationError` if authentication fails
+
+---
+
+### signInWithSmartWallet
+
+Initiates smart wallet authentication by requesting a signature challenge.
+
+```typescript
+const { message, nonce } = await authClient.signInWithSmartWallet(
+  '0x1234...5678',
+  'evm'
+);
+
+// Sign the message with the wallet
+const signature = await wallet.signMessage(message);
+
+// Complete authentication
+await authClient.authenticateSmartWallet(
+  '0x1234...5678',
+  'evm',
+  signature
+);
+```
+
+<ParamField path="address" type="string" required>
+  Wallet address
+</ParamField>
+
+<ParamField path="type" type="'evm' | 'solana'" required>
+  Blockchain type
+</ParamField>
+
+**Returns:** `Promise<{ message: string; nonce: string }>` - Challenge data to sign
+
+**Throws:** `CrossmintAuthenticationError` if request fails
+
+---
+
+### authenticateSmartWallet
+
+Completes smart wallet authentication with a signed message.
+
+```typescript
+const result = await authClient.authenticateSmartWallet(
+  '0x1234...5678',
+  'evm',
+  signature
+);
+```
+
+<ParamField path="address" type="string" required>
+  Wallet address
+</ParamField>
+
+<ParamField path="type" type="'evm' | 'solana'" required>
+  Blockchain type
+</ParamField>
+
+<ParamField path="signature" type="string" required>
+  Signed message from the wallet
+</ParamField>
+
+**Returns:** `Promise<{ oneTimeSecret: string }>` - One-time secret for session establishment
+
+**Throws:** `CrossmintAuthenticationError` if authentication fails
+
+---
+
+### handleRefreshAuthMaterial
+
+Manually triggers token refresh. This is automatically scheduled before token expiration.
+
+```typescript
+const authMaterial = await authClient.handleRefreshAuthMaterial();
+```
+
+<ParamField path="refreshTokenSecret" type="string" optional>
+  Custom refresh token secret. If not provided, uses stored token.
+</ParamField>
+
+**Returns:** `Promise<AuthMaterialWithUser | null>` - New auth material or null if refresh fails
+
+---
+
+### logout
+
+Logs out the current user and clears all stored credentials.
+
+```typescript
+await authClient.logout();
+```
+
+**Returns:** `Promise<void>`
+
+## Types
+
+### AuthMaterialWithUser
+
+```typescript
+interface AuthMaterialWithUser {
+  jwt: string;
+  refreshToken: {
+    secret: string;
+    expiresAt: string;
+  };
+  user: {
+    id: string;
+    email?: string;
+    userId: string;
+  };
+}
+```
+
+### OAuthProvider
+
+```typescript
+type OAuthProvider = 'google' | 'twitter' | 'facebook' | 'discord' | 'apple';
+```
+
+## Error Handling
+
+```typescript
+import { CrossmintAuthenticationError } from '@crossmint/common-sdk-auth';
+
+try {
+  await authClient.sendEmailOtp(email);
+} catch (error) {
+  if (error instanceof CrossmintAuthenticationError) {
+    console.error('Auth error:', error.message);
+  }
+}
+```
+
+## Best Practices
+
+1. **Token Refresh**: The client automatically refreshes tokens before expiration. Don't manually refresh unless necessary.
+2. **Storage**: Use custom storage providers for React Native or other non-browser environments.
+3. **Error Handling**: Always handle `CrossmintAuthenticationError` for authentication failures.
+4. **Server Routes**: For Next.js or other server frameworks, provide custom `refreshRoute` and `logoutRoute` for secure cookie handling.
+
+## Example: Complete Email OTP Flow
+
+```typescript
+import { CrossmintAuthClient } from '@crossmint/client-sdk-auth';
+
+const authClient = CrossmintAuthClient.from(crossmint, {
+  callbacks: {
+    onTokenRefresh: (authMaterial) => {
+      console.log('Session refreshed');
+    }
+  }
+});
+
+// Step 1: Send OTP
+const { emailId } = await authClient.sendEmailOtp('user@example.com');
+
+// Step 2: User enters code from email
+const otpCode = '123456'; // From user input
+
+// Step 3: Verify OTP
+const oneTimeSecret = await authClient.confirmEmailOtp(
+  'user@example.com',
+  emailId,
+  otpCode
+);
+
+// Step 4: Get user info
+const user = await authClient.getUser();
+console.log('Logged in as:', user.email);
+```

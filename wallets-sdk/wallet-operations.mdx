@@ -1,0 +1,406 @@
+---
+title: "Wallet Operations"
+description: "Common wallet operations including balances, transfers, and activity tracking"
+---
+
+## Get Balances
+
+Retrieve the wallet's token balances. The response always includes the native token (ETH, SOL, XLM) and USDC.
+
+### Method Signature
+
+```typescript
+wallet.balances(tokens?: string[]): Promise<Balances<C>>
+```
+
+### Basic Usage
+
+```typescript
+const balances = await wallet.balances();
+
+console.log(balances.nativeToken.amount); // e.g., "1.5" ETH/SOL/XLM
+console.log(balances.usdc.amount);        // e.g., "100.00"
+```
+
+### With Additional Tokens
+
+Query additional token balances by providing contract addresses or token symbols:
+
+```typescript
+const balances = await wallet.balances([
+    "0x1234567890abcdef1234567890abcdef12345678", // Token contract address
+    "usdt",                                          // Token symbol
+]);
+
+console.log(balances.tokens[0].amount);     // First additional token
+console.log(balances.tokens[0].symbol);     // Token symbol
+console.log(balances.tokens[0].decimals);   // Token decimals
+```
+
+### Balance Response Type
+
+<ParamField path="nativeToken" type="TokenBalance">
+  Native token balance (ETH, SOL, or XLM)
+  
+  <Expandable title="properties">
+    <ParamField path="symbol" type="string">
+      Token symbol (e.g., "eth", "sol", "xlm")
+    </ParamField>
+    <ParamField path="name" type="string">
+      Token name
+    </ParamField>
+    <ParamField path="amount" type="string">
+      Human-readable amount (decimal format)
+    </ParamField>
+    <ParamField path="decimals" type="number">
+      Token decimals
+    </ParamField>
+    <ParamField path="rawAmount" type="string">
+      Raw amount (in smallest unit)
+    </ParamField>
+    <ParamField path="contractAddress" type="string" optional>
+      EVM: Contract address
+    </ParamField>
+    <ParamField path="mintHash" type="string" optional>
+      Solana: Mint address
+    </ParamField>
+    <ParamField path="contractId" type="string" optional>
+      Stellar: Contract ID
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="usdc" type="TokenBalance">
+  USDC balance (same structure as nativeToken)
+</ParamField>
+
+<ParamField path="tokens" type="TokenBalance[]">
+  Array of additional token balances
+</ParamField>
+
+## Send Tokens
+
+Transfer tokens from the wallet to another address or user.
+
+### Method Signature
+
+```typescript
+wallet.send(
+    to: string | UserLocator,
+    token: string,
+    amount: string,
+    options?: SendTokenTransactionOptions
+): Promise<Transaction>
+```
+
+### Basic Transfer
+
+```typescript
+const transaction = await wallet.send(
+    "0xRecipientAddress...",
+    "usdc",
+    "100"
+);
+
+console.log(transaction.hash);         // Transaction hash
+console.log(transaction.explorerLink); // Blockchain explorer link
+```
+
+### Send to User Locator
+
+Send to a user by email, phone, or user ID:
+
+```typescript
+// Send to email
+const tx1 = await wallet.send(
+    { email: "recipient@example.com" },
+    "usdc",
+    "50"
+);
+
+// Send to phone
+const tx2 = await wallet.send(
+    { phone: "+1234567890" },
+    "usdc",
+    "25"
+);
+
+// Send to user ID
+const tx3 = await wallet.send(
+    { userId: "user_123" },
+    "eth",
+    "0.1"
+);
+```
+
+### Send Native Token
+
+```typescript
+// Send ETH (on EVM chains)
+const tx = await wallet.send(
+    "0xRecipientAddress...",
+    "eth",
+    "0.5"
+);
+
+// Send SOL (on Solana)
+const tx = await wallet.send(
+    "SolanaAddress...",
+    "sol",
+    "2.0"
+);
+```
+
+### Send Custom Token
+
+Provide a token contract address:
+
+```typescript
+const tx = await wallet.send(
+    "0xRecipientAddress...",
+    "0x1234567890abcdef1234567890abcdef12345678", // Token contract
+    "1000"
+);
+```
+
+### Transaction Types
+
+Specify the transaction type for different use cases:
+
+```typescript
+const tx = await wallet.send(
+    "0xRecipientAddress...",
+    "usdc",
+    "100",
+    {
+        transactionType: "onramp", // or "regulated-transfer" or "direct"
+    }
+);
+```
+
+### Prepare-Only Mode
+
+Create a transaction without immediately executing it:
+
+```typescript
+const preparedTx = await wallet.send(
+    "0xRecipientAddress...",
+    "usdc",
+    "100",
+    {
+        experimental_prepareOnly: true,
+    }
+);
+
+console.log(preparedTx.transactionId); // Use later with approve()
+
+// Approve and execute later
+const completedTx = await wallet.approve({
+    transactionId: preparedTx.transactionId,
+});
+```
+
+### Parameters
+
+<ParamField path="to" type="string | UserLocator" required>
+  Recipient address or user locator
+  
+  <Expandable title="UserLocator types">
+    ```typescript
+    { email: string }
+    { phone: string }
+    { userId: string }
+    { x: string }      // X/Twitter handle
+    { twitter: string } // Twitter handle
+    ```
+  </Expandable>
+</ParamField>
+
+<ParamField path="token" type="string" required>
+  Token to send (address, symbol like "usdc", or native token like "eth")
+</ParamField>
+
+<ParamField path="amount" type="string" required>
+  Amount to send in decimal format (e.g., "100" for 100 USDC)
+</ParamField>
+
+<ParamField path="options" type="SendTokenTransactionOptions">
+  <Expandable title="properties">
+    <ParamField path="transactionType" type="'onramp' | 'regulated-transfer' | 'direct'">
+      Type of transaction
+    </ParamField>
+    <ParamField path="experimental_prepareOnly" type="boolean">
+      If true, creates transaction without executing it
+    </ParamField>
+    <ParamField path="experimental_signer" type="string">
+      Custom signer locator to use
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Approve Transaction or Signature
+
+Approve and execute a previously created transaction or sign a pending signature.
+
+### Method Signature
+
+```typescript
+wallet.approve(params: ApproveParams): Promise<Transaction | Signature>
+```
+
+### Approve Transaction
+
+```typescript
+const transaction = await wallet.approve({
+    transactionId: "tx_123abc",
+});
+
+console.log(transaction.hash);
+```
+
+### Approve Signature (EVM only)
+
+```typescript
+const signature = await wallet.approve({
+    signatureId: "sig_123abc",
+});
+
+console.log(signature.signature);
+```
+
+### With Additional Signers
+
+```typescript
+const transaction = await wallet.approve({
+    transactionId: "tx_123abc",
+    options: {
+        additionalSigners: [otherSigner],
+    },
+});
+```
+
+## Get Wallet Activity
+
+Retrieve the wallet's transaction history and events.
+
+### Method Signature
+
+```typescript
+wallet.experimental_activity(): Promise<Activity>
+```
+
+### Usage
+
+```typescript
+const activity = await wallet.experimental_activity();
+
+console.log(activity.events);
+```
+
+<Note>
+This is an experimental API and may change in future versions.
+</Note>
+
+## Get Transactions
+
+Retrieve all transactions for the wallet.
+
+### Method Signature
+
+```typescript
+wallet.experimental_transactions(): Promise<GetTransactionsResponse>
+```
+
+### Usage
+
+```typescript
+const transactions = await wallet.experimental_transactions();
+
+console.log(transactions);
+```
+
+## Get Single Transaction
+
+Retrieve details for a specific transaction by ID.
+
+### Method Signature
+
+```typescript
+wallet.experimental_transaction(transactionId: string): Promise<GetTransactionSuccessResponse>
+```
+
+### Usage
+
+```typescript
+const transaction = await wallet.experimental_transaction("tx_123abc");
+
+console.log(transaction.status);
+console.log(transaction.onChain.txId);
+```
+
+## Get NFTs
+
+Retrieve NFTs owned by the wallet.
+
+### Method Signature
+
+```typescript
+wallet.experimental_nfts(params: {
+    perPage: number;
+    page: number;
+}): Promise<NFTsResponse>
+```
+
+### Usage
+
+```typescript
+const nfts = await wallet.experimental_nfts({
+    perPage: 20,
+    page: 1,
+});
+
+console.log(nfts);
+```
+
+<Note>
+This is an experimental API and may change in future versions.
+</Note>
+
+## Staging Fund (Testnet Only)
+
+Fund a wallet with USDXM tokens in staging/testnet environments.
+
+### Method Signature
+
+```typescript
+wallet.stagingFund(amount: number, chain?: Chain): Promise<FundWalletResponse>
+```
+
+### Usage
+
+```typescript
+const response = await wallet.stagingFund(100); // Fund with 100 USDXM
+
+console.log(response);
+```
+
+<Warning>
+This method only works in staging/testnet environments and exclusively supports USDXM tokens.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="EVM Wallets" icon="ethereum" href="/wallets-sdk/evm-wallets">
+    Learn about EVM-specific operations
+  </Card>
+  <Card title="Solana Wallets" icon="circle" href="/wallets-sdk/solana-wallets">
+    Learn about Solana-specific operations
+  </Card>
+  <Card title="Delegated Signers" icon="users" href="/wallets-sdk/delegated-signers">
+    Add multiple signers to a wallet
+  </Card>
+  <Card title="Stellar Wallets" icon="star" href="/wallets-sdk/stellar-wallets">
+    Learn about Stellar-specific operations
+  </Card>
+</CardGroup>

@@ -1,0 +1,378 @@
+---
+title: 'Custom Refresh Routes'
+description: 'Set up custom refresh routes for enhanced security with HttpOnly cookies'
+---
+
+Custom refresh routes allow you to store authentication material in HttpOnly cookies tied to your domain, providing enhanced security by preventing client-side JavaScript from accessing sensitive tokens.
+
+## Why Use Custom Refresh Routes?
+
+Custom refresh routes provide several security benefits:
+
+- **HttpOnly cookies**: Refresh tokens are stored in HttpOnly cookies, preventing XSS attacks from accessing them
+- **Domain-specific**: Cookies are tied to your domain, not a third-party domain
+- **Secure transmission**: Configure cookies with `Secure` and `SameSite` flags for additional protection
+- **Centralized control**: Manage token refresh logic on your own backend
+
+<Warning>
+  The JWT token cannot be HttpOnly as it needs to be accessible to the client SDK for API calls. Only the refresh token is stored in an HttpOnly cookie.
+</Warning>
+
+Source: `README.md:83`
+
+## Cookie Configuration
+
+Configure cookie options when initializing `CrossmintAuth`:
+
+```ts
+import { createCrossmint, CrossmintAuth } from "@crossmint/server-sdk";
+
+const crossmint = createCrossmint({
+    apiKey: process.env.SERVER_CROSSMINT_API_KEY || "",
+});
+
+const crossmintAuth = CrossmintAuth.from(crossmint, {
+    cookieOptions: {
+        httpOnly: true,
+        sameSite: "Strict",
+        secure: true,
+        domain: ".example.com",
+    },
+});
+```
+
+Source: `README.md:72`
+
+### Cookie Options
+
+<ParamField path="httpOnly" type="boolean" default="false">
+  When `true`, makes the refresh token cookie inaccessible to client-side JavaScript. The JWT cookie will always be accessible to the client SDK.
+</ParamField>
+
+<ParamField path="secure" type="boolean" default="false">
+  When `true`, cookies are only sent over HTTPS connections. Always set to `true` in production.
+</ParamField>
+
+<ParamField path="sameSite" type="'Strict' | 'Lax' | 'None'" default="'Lax'">
+  Controls when cookies are sent with cross-site requests:
+  - `Strict`: Cookies are only sent in first-party contexts
+  - `Lax`: Cookies are sent with top-level navigations
+  - `None`: Cookies are sent with all requests (requires `secure: true`)
+</ParamField>
+
+<ParamField path="domain" type="string">
+  The domain for which the cookies are valid. Use a leading dot (e.g., `.example.com`) to include subdomains.
+</ParamField>
+
+Source: `cookies.ts:83`
+
+## Setting Up a Custom Refresh Route
+
+<Steps>
+  <Step title="Configure CrossmintAuth with cookie options">
+    Initialize `CrossmintAuth` with your desired cookie configuration:
+
+    ```ts
+    const crossmintAuth = CrossmintAuth.from(crossmint, {
+        refreshRoute: "/api/refresh",
+        cookieOptions: {
+            httpOnly: true,
+            sameSite: "Strict",
+            secure: process.env.NODE_ENV === "production",
+        },
+    });
+    ```
+
+    Source: `README.md:106`
+  </Step>
+
+  <Step title="Create the refresh endpoint">
+    Implement the refresh route handler using `handleCustomRefresh()`:
+
+    <CodeGroup>
+    ```ts Next.js App Router
+    // app/api/refresh/route.ts
+    import { NextRequest } from "next/server";
+    import { crossmintAuth } from "@/lib/crossmint";
+
+    export async function POST(request: NextRequest) {
+        return await crossmintAuth.handleCustomRefresh(request);
+    }
+    ```
+
+    ```ts Next.js Pages Router
+    // pages/api/refresh.ts
+    import type { NextApiRequest, NextApiResponse } from "next";
+    import { crossmintAuth } from "@/lib/crossmint";
+
+    export default async function handler(
+        req: NextApiRequest,
+        res: NextApiResponse
+    ) {
+        await crossmintAuth.handleCustomRefresh(req, res);
+        res.end();
+    }
+    ```
+
+    ```ts Express
+    // routes/auth.js
+    import express from "express";
+    import { crossmintAuth } from "../lib/crossmint.js";
+
+    const router = express.Router();
+
+    router.post("/refresh", async (req, res) => {
+        await crossmintAuth.handleCustomRefresh(req, res);
+        res.end();
+    });
+
+    export default router;
+    ```
+    </CodeGroup>
+
+    Source: `README.md:92`
+  </Step>
+
+  <Step title="Configure the client SDK">
+    Update your client SDK configuration to use the custom refresh route:
+
+    ```ts
+    import { CrossmintAuthClient } from "@crossmint/client-sdk-auth";
+
+    const authClient = CrossmintAuthClient.from(crossmint, {
+        refreshRoute: "/api/refresh",
+    });
+    ```
+  </Step>
+</Steps>
+
+## How Custom Refresh Works
+
+When a token needs to be refreshed:
+
+<Steps>
+  <Step title="Client requests refresh">
+    The client SDK sends a POST request to your custom refresh route.
+  </Step>
+
+  <Step title="Extract refresh token">
+    The server extracts the refresh token from either the request body or cookies:
+
+    ```ts
+    const body = await requestAdapter.getBody();
+    const { refresh: tokenFromBody } = body ?? {};
+    const authCookies = getAuthCookies(request, { throwError: false });
+    const tokenFromCookies = authCookies?.refreshToken;
+    const refreshToken = tokenFromBody ?? tokenFromCookies;
+    ```
+
+    Source: `CrossmintAuthServer.ts:89`
+  </Step>
+
+  <Step title="Refresh the token">
+    The server calls the Crossmint API to refresh the token:
+
+    ```ts
+    const refreshedAuthMaterial = await this.refresh(refreshToken);
+    ```
+  </Step>
+
+  <Step title="Store in cookies">
+    The new authentication material is stored in cookies with your configured options:
+
+    ```ts
+    this.storeAuthMaterial(response, refreshedAuthMaterial);
+    ```
+  </Step>
+
+  <Step title="Return response">
+    The response with updated cookies is returned to the client.
+  </Step>
+</Steps>
+
+Source: `CrossmintAuthServer.ts:79`
+
+## Setting Up a Custom Logout Route
+
+When using HttpOnly cookies, logout must happen server-side:
+
+<CodeGroup>
+```ts Next.js App Router
+// app/api/logout/route.ts
+import { NextRequest } from "next/server";
+import { crossmintAuth } from "@/lib/crossmint";
+
+export async function POST(request: NextRequest) {
+    return await crossmintAuth.logout(request);
+}
+```
+
+```ts Next.js Pages Router
+// pages/api/logout.ts
+import type { NextApiRequest, NextApiResponse } from "next";
+import { crossmintAuth } from "@/lib/crossmint";
+
+export default async function handler(
+    req: NextApiRequest,
+    res: NextApiResponse
+) {
+    await crossmintAuth.logout(req, res);
+    res.end();
+}
+```
+
+```ts Express
+router.post("/logout", async (req, res) => {
+    await crossmintAuth.logout(req, res);
+    res.end();
+});
+```
+</CodeGroup>
+
+Source: `README.md:116`
+
+## Error Handling
+
+The `handleCustomRefresh()` method automatically handles errors:
+
+- Returns a 401 Unauthorized response if the refresh token is invalid
+- Clears authentication cookies on error
+- Logs error details to the console
+
+```ts
+try {
+    const response = await crossmintAuth.handleCustomRefresh(request);
+    return response;
+} catch (error) {
+    // Automatically handled - cookies are cleared and 401 is returned
+}
+```
+
+Source: `CrossmintAuthServer.ts:113`
+
+## Complete Example
+
+Here's a complete example with custom refresh and logout routes:
+
+<CodeGroup>
+```ts Next.js Setup (lib/crossmint.ts)
+import { createCrossmint, CrossmintAuth } from "@crossmint/server-sdk";
+
+const crossmint = createCrossmint({
+    apiKey: process.env.SERVER_CROSSMINT_API_KEY || "",
+});
+
+export const crossmintAuth = CrossmintAuth.from(crossmint, {
+    refreshRoute: "/api/auth/refresh",
+    cookieOptions: {
+        httpOnly: true,
+        sameSite: "Strict",
+        secure: process.env.NODE_ENV === "production",
+        domain: process.env.COOKIE_DOMAIN,
+    },
+});
+```
+
+```ts Refresh Route (app/api/auth/refresh/route.ts)
+import { NextRequest } from "next/server";
+import { crossmintAuth } from "@/lib/crossmint";
+
+export async function POST(request: NextRequest) {
+    return await crossmintAuth.handleCustomRefresh(request);
+}
+```
+
+```ts Logout Route (app/api/auth/logout/route.ts)
+import { NextRequest } from "next/server";
+import { crossmintAuth } from "@/lib/crossmint";
+
+export async function POST(request: NextRequest) {
+    return await crossmintAuth.logout(request);
+}
+```
+
+```ts Protected API Route (app/api/user/route.ts)
+import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { crossmintAuth } from "@/lib/crossmint";
+
+export async function GET(request: NextRequest) {
+    try {
+        const cookieStore = cookies();
+        const jwtCookie = cookieStore.get("crossmint-session")?.value;
+        const refreshCookie = cookieStore.get("crossmint-refresh-token")?.value;
+
+        const { userId } = await crossmintAuth.getSession({
+            jwt: jwtCookie,
+            refreshToken: refreshCookie,
+        });
+
+        const user = await crossmintAuth.getUser(userId);
+
+        return NextResponse.json({ user });
+    } catch (error) {
+        return NextResponse.json(
+            { error: "Unauthorized" },
+            { status: 401 }
+        );
+    }
+}
+```
+</CodeGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Always use secure cookies in production">
+    Set `secure: true` in production to ensure cookies are only transmitted over HTTPS:
+
+    ```ts
+    cookieOptions: {
+        secure: process.env.NODE_ENV === "production",
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Use Strict SameSite policy when possible">
+    Use `sameSite: "Strict"` for maximum protection against CSRF attacks, unless you need cross-site functionality:
+
+    ```ts
+    cookieOptions: {
+        sameSite: "Strict",
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Configure domain for subdomain support">
+    If your app uses subdomains, set the domain with a leading dot:
+
+    ```ts
+    cookieOptions: {
+        domain: ".example.com", // Works for app.example.com, api.example.com, etc.
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Handle refresh errors gracefully">
+    Always handle refresh errors by redirecting users to login:
+
+    ```ts
+    try {
+        await crossmintAuth.getSession(request, response);
+    } catch (error) {
+        return redirect("/login");
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="shield-check" href="/server-sdk/authentication">
+    Learn more about authentication methods
+  </Card>
+  <Card title="Session Management" icon="clock-rotate-left" href="/server-sdk/session-management">
+    Understand session validation and token refresh
+  </Card>
+</CardGroup>

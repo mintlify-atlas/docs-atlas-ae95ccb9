@@ -1,80 +1,604 @@
 ---
 title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+description: "Create your first wallet-enabled application in under 5 minutes"
 ---
 
-## Get started in three steps
+## Overview
 
-Get your documentation site running locally and make your first customization.
-
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+This guide will walk you through creating a simple application that creates a wallet for a user and allows them to check their balance and send tokens. You'll learn the core concepts of the Crossmint SDK.
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  **Time to complete:** ~5 minutes
+  
+  **What you'll build:** A wallet creation app with balance checking and token transfers
 </Note>
+
+## Prerequisites
+
+<Steps>
+  <Step title="Node.js & Package Manager">
+    Ensure you have Node.js 16+ and npm, yarn, or pnpm installed.
+    
+    ```bash
+    node --version  # Should be v16 or higher
+    ```
+  </Step>
+  
+  <Step title="Crossmint API Key">
+    Get your API key from the [Crossmint Console](https://www.crossmint.com/console/projects/apiKeys).
+    
+    Make sure your API key has these scopes enabled:
+    - **Wallet API** (all permissions)
+    - **Users** (all permissions)
+  </Step>
+</Steps>
+
+## Choose Your Path
+
+<CardGroup cols={2}>
+  <Card title="React Application" icon="react" href="#react-quickstart">
+    Build with React hooks and providers
+  </Card>
+  
+  <Card title="Vanilla TypeScript" icon="code" href="#vanilla-quickstart">
+    Use the core SDK without a framework
+  </Card>
+</CardGroup>
+
+---
+
+## React Quickstart
+
+### Step 1: Install Dependencies
+
+<CodeGroup>
+```bash npm
+npm install @crossmint/client-sdk-react-ui
+```
+
+```bash yarn
+yarn add @crossmint/client-sdk-react-ui
+```
+
+```bash pnpm
+pnpm add @crossmint/client-sdk-react-ui
+```
+</CodeGroup>
+
+### Step 2: Set Up Environment Variables
+
+Create a `.env.local` file in your project root:
+
+```bash .env.local
+NEXT_PUBLIC_CROSSMINT_API_KEY=your_client_api_key_here
+```
+
+<Warning>
+  Use a **client-side API key** (starts with `client_` or `pk_`). Never expose server-side keys in the browser.
+</Warning>
+
+### Step 3: Configure Providers
+
+Wrap your application with Crossmint providers:
+
+```tsx app/layout.tsx
+"use client";
+
+import {
+  CrossmintProvider,
+  CrossmintAuthProvider,
+  CrossmintWalletProvider,
+} from "@crossmint/client-sdk-react-ui";
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body>
+        <CrossmintProvider apiKey={process.env.NEXT_PUBLIC_CROSSMINT_API_KEY!}>
+          <CrossmintAuthProvider authModalTitle="Sign in to MyApp">
+            <CrossmintWalletProvider
+              createOnLogin={{
+                chain: "polygon-amoy",
+                signer: { type: "email" },
+              }}
+            >
+              {children}
+            </CrossmintWalletProvider>
+          </CrossmintAuthProvider>
+        </CrossmintProvider>
+      </body>
+    </html>
+  );
+}
+```
+
+<Info>
+  **What's happening here?**
+  - `CrossmintProvider` - Initializes the SDK with your API key
+  - `CrossmintAuthProvider` - Handles user authentication
+  - `CrossmintWalletProvider` - Automatically creates a wallet when users log in
+</Info>
+
+### Step 4: Create Your Wallet Component
+
+Build a component that displays wallet information and allows token transfers:
+
+```tsx components/WalletDemo.tsx
+"use client";
+
+import { useAuth, useWallet } from "@crossmint/client-sdk-react-ui";
+import { useState, useEffect } from "react";
+
+export default function WalletDemo() {
+  const { login, logout, user, status } = useAuth();
+  const { wallet, status: walletStatus } = useWallet();
+  const [balance, setBalance] = useState<string | null>(null);
+  const [recipient, setRecipient] = useState("");
+  const [amount, setAmount] = useState("");
+
+  // Load wallet balance
+  useEffect(() => {
+    async function loadBalance() {
+      if (wallet) {
+        const balances = await wallet.balances();
+        setBalance(balances.usdc.amount);
+      }
+    }
+    loadBalance();
+  }, [wallet]);
+
+  // Handle token transfer
+  async function sendTokens() {
+    if (!wallet || !recipient || !amount) return;
+    
+    try {
+      const transaction = await wallet.send(recipient, "usdc", amount);
+      alert(`Transaction successful! View: ${transaction.explorerLink}`);
+    } catch (error) {
+      alert(`Transaction failed: ${error}`);
+    }
+  }
+
+  // Show login button if not authenticated
+  if (status === "logged-out") {
+    return (
+      <div style={{ padding: "2rem", textAlign: "center" }}>
+        <h1>Welcome to Crossmint Wallet Demo</h1>
+        <p>Sign in to create your wallet</p>
+        <button onClick={login} style={buttonStyle}>
+          Sign In
+        </button>
+      </div>
+    );
+  }
+
+  // Show loading state
+  if (walletStatus === "loading") {
+    return <div style={{ padding: "2rem" }}>Loading wallet...</div>;
+  }
+
+  // Show wallet interface
+  return (
+    <div style={{ padding: "2rem", maxWidth: "600px", margin: "0 auto" }}>
+      <h1>Your Wallet</h1>
+      
+      <div style={cardStyle}>
+        <p><strong>Email:</strong> {user?.email}</p>
+        <p><strong>Address:</strong> {wallet?.address}</p>
+        <p><strong>USDC Balance:</strong> {balance || "Loading..."}</p>
+      </div>
+
+      <div style={cardStyle}>
+        <h2>Send USDC</h2>
+        <input
+          type="text"
+          placeholder="Recipient address"
+          value={recipient}
+          onChange={(e) => setRecipient(e.target.value)}
+          style={inputStyle}
+        />
+        <input
+          type="text"
+          placeholder="Amount"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          style={inputStyle}
+        />
+        <button onClick={sendTokens} style={buttonStyle}>
+          Send Tokens
+        </button>
+      </div>
+
+      <button onClick={logout} style={{ ...buttonStyle, background: "#666" }}>
+        Logout
+      </button>
+    </div>
+  );
+}
+
+// Simple styles
+const buttonStyle = {
+  padding: "0.75rem 1.5rem",
+  background: "#6366f1",
+  color: "white",
+  border: "none",
+  borderRadius: "8px",
+  cursor: "pointer",
+  fontSize: "1rem",
+  marginTop: "1rem",
+};
+
+const inputStyle = {
+  width: "100%",
+  padding: "0.75rem",
+  marginBottom: "1rem",
+  borderRadius: "8px",
+  border: "1px solid #ddd",
+  fontSize: "1rem",
+};
+
+const cardStyle = {
+  background: "#f9fafb",
+  padding: "1.5rem",
+  borderRadius: "12px",
+  marginBottom: "1rem",
+};
+```
+
+### Step 5: Run Your Application
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) and test your wallet!
+
+<Check>
+  **Success!** You now have a working wallet application with:
+  - User authentication via email OTP
+  - Automatic wallet creation
+  - Balance checking
+  - Token transfers
+</Check>
+
+---
+
+## Vanilla TypeScript Quickstart
+
+For non-React applications or programmatic wallet management.
+
+### Step 1: Install Dependencies
+
+<CodeGroup>
+```bash npm
+npm install @crossmint/wallets-sdk
+```
+
+```bash yarn
+yarn add @crossmint/wallets-sdk
+```
+
+```bash pnpm
+pnpm add @crossmint/wallets-sdk
+```
+</CodeGroup>
+
+### Step 2: Set Up Environment Variables
+
+Create a `.env` file:
+
+```bash .env
+CROSSMINT_API_KEY=your_api_key_here
+```
+
+<Info>
+  You can use either a client-side or server-side API key. For server-side, you have access to additional features.
+</Info>
+
+### Step 3: Create a Wallet
+
+Here's a complete example that creates a wallet and performs operations:
+
+```typescript index.ts
+import { CrossmintWallets, createCrossmint } from "@crossmint/wallets-sdk";
+
+// Initialize Crossmint
+const crossmint = createCrossmint({
+  apiKey: process.env.CROSSMINT_API_KEY || "",
+  experimental_customAuth: {
+    jwt: "<your-user-jwt>", // Required for client-side calls
+  },
+});
+
+const crossmintWallets = CrossmintWallets.from(crossmint);
+
+// Create or get existing wallet
+const wallet = await crossmintWallets.getOrCreateWallet({
+  chain: "polygon-amoy",
+  signer: {
+    type: "email",
+    email: "user@example.com",
+    onAuthRequired: async (needsAuth, sendEmailWithOtp, verifyOtp, reject) => {
+      if (needsAuth) {
+        // Send OTP email
+        await sendEmailWithOtp();
+        
+        // In a real application, prompt the user for the OTP
+        // For this example, we'll assume you have the OTP
+        const otp = "123456"; // Get this from user input
+        
+        // Verify the OTP
+        await verifyOtp(otp);
+      }
+    },
+  },
+});
+
+console.log("Wallet created!");
+console.log("Address:", wallet.address);
+```
+
+### Step 4: Check Balances
+
+Retrieve wallet balances:
+
+```typescript
+const balances = await wallet.balances();
+
+console.log("Native Token:", balances.nativeToken.amount);
+console.log("USDC:", balances.usdc.amount);
+```
+
+### Step 5: Send Tokens
+
+Transfer tokens to another address:
+
+```typescript
+const transaction = await wallet.send(
+  "0x742d35Cc6634C0532925a3b844Bc454e4438f44e", // recipient
+  "usdc",  // token
+  "10.5"   // amount
+);
+
+console.log("Transaction successful!");
+console.log("Explorer link:", transaction.explorerLink);
+```
+
+### Step 6: Advanced Operations
+
+For chain-specific operations:
+
+```typescript
+import { SolanaWallet, EVMWallet } from "@crossmint/wallets-sdk";
+
+// Solana-specific operations
+const solanaWallet = SolanaWallet.from(wallet);
+const solTx = await solanaWallet.sendTransaction({
+  transaction: "<serialized-transaction>",
+});
+
+// EVM-specific operations
+const evmWallet = EVMWallet.from(wallet);
+const evmTx = await evmWallet.sendTransaction({
+  transaction: "<serialized-transaction>",
+});
+
+console.log("Solana TX:", solTx.explorerLink);
+console.log("EVM TX:", evmTx.explorerLink);
+```
+
+### Step 7: Run Your Script
+
+```bash
+node --loader ts-node/esm index.ts
+# or with tsx
+tsx index.ts
+```
+
+<Check>
+  **Success!** You can now create and manage wallets programmatically.
+</Check>
+
+---
+
+## Understanding Key Concepts
+
+<AccordionGroup>
+  <Accordion title="Wallet Signers" icon="key">
+    Signers determine how wallet transactions are authorized. Crossmint supports:
+    
+    - **Email** - User authenticates via email OTP
+    - **Passkey** - WebAuthn/biometric authentication
+    - **API Key** - Programmatic access (server-side only)
+    - **External Wallet** - Use existing wallet for signing
+    
+    ```typescript
+    // Email signer
+    { type: "email", email: "user@example.com" }
+    
+    // API key signer (server-side)
+    { type: "api-key" }
+    ```
+  </Accordion>
+  
+  <Accordion title="Multi-Chain Support" icon="link">
+    The same code works across all supported chains:
+    
+    **Solana:**
+    - `solana` (mainnet)
+    - `solana-devnet`
+    
+    **EVM Chains:**
+    - `polygon`, `polygon-amoy`
+    - `base`, `base-sepolia`
+    - `ethereum`, `sepolia`
+    - `arbitrum`, `arbitrum-sepolia`
+    - And 15+ more...
+    
+    ```typescript
+    // Just change the chain parameter
+    await crossmintWallets.getOrCreateWallet({
+      chain: "base", // or "solana", "polygon", etc.
+      signer: { type: "email", email: "user@example.com" },
+    });
+    ```
+  </Accordion>
+  
+  <Accordion title="Authentication Flow" icon="shield-check">
+    For email-based authentication:
+    
+    1. User provides email address
+    2. Crossmint sends OTP code
+    3. User enters OTP
+    4. Wallet is created/accessed
+    
+    ```typescript
+    onAuthRequired: async (needsAuth, sendEmailWithOtp, verifyOtp, reject) => {
+      if (needsAuth) {
+        await sendEmailWithOtp();
+        // Show OTP input to user
+        const otp = await getUserOtp(); // Your UI logic
+        await verifyOtp(otp);
+      }
+    }
+    ```
+    
+    <Note>
+      When using React SDK, this is handled automatically by the provider!
+    </Note>
+  </Accordion>
+  
+  <Accordion title="Wallet Activity" icon="clock">
+    Track all wallet transactions:
+    
+    ```typescript
+    const activity = await wallet.experimental_activity();
+    
+    activity.events.forEach(event => {
+      console.log(event.type);      // "send", "receive", etc.
+      console.log(event.timestamp);
+      console.log(event.amount);
+    });
+    ```
+  </Accordion>
+  
+  <Accordion title="Delegated Signers" icon="users">
+    Allow other addresses to sign transactions on behalf of the wallet:
+    
+    ```typescript
+    // Add a delegated signer
+    await wallet.addDelegatedSigner({
+      signer: "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
+    });
+    
+    // List all delegated signers
+    const signers = await wallet.delegatedSigners();
+    console.log(signers);
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Wallets SDK Deep Dive" icon="wallet" href="/wallets-sdk/overview">
+    Explore advanced wallet features and multi-chain support
+  </Card>
+  
+  <Card title="Authentication Guide" icon="lock" href="/concepts/authentication">
+    Learn about authentication options and security
+  </Card>
+  
+  <Card title="React Components" icon="react" href="/client-sdk/react-ui">
+    Discover all available React hooks and components
+  </Card>
+  
+  <Card title="API Reference" icon="code" href="/api/wallets-sdk/crossmint-wallets">
+    Browse the complete API documentation
+  </Card>
+</CardGroup>
+
+## Common Patterns
+
+<CodeGroup>
+```typescript Multiple Wallets
+// Create wallets on different chains
+const polygonWallet = await crossmintWallets.getOrCreateWallet({
+  chain: "polygon",
+  signer: { type: "email", email: user.email },
+});
+
+const solanaWallet = await crossmintWallets.getOrCreateWallet({
+  chain: "solana",
+  signer: { type: "email", email: user.email },
+});
+
+// Same user, different chains
+console.log("Polygon:", polygonWallet.address);
+console.log("Solana:", solanaWallet.address);
+```
+
+```typescript Error Handling
+try {
+  const tx = await wallet.send(recipient, "usdc", "100");
+  console.log("Success:", tx.explorerLink);
+} catch (error) {
+  if (error.code === "INSUFFICIENT_BALANCE") {
+    console.error("Not enough funds");
+  } else if (error.code === "INVALID_ADDRESS") {
+    console.error("Invalid recipient address");
+  } else {
+    console.error("Transaction failed:", error.message);
+  }
+}
+```
+
+```typescript With Server-Side Auth
+import { createCrossmint } from "@crossmint/server-sdk";
+
+// Server-side - no JWT required
+const crossmint = createCrossmint({
+  apiKey: process.env.SERVER_CROSSMINT_API_KEY,
+});
+
+const wallet = await crossmintWallets.getOrCreateWallet({
+  chain: "polygon",
+  signer: { type: "api-key" },
+});
+```
+</CodeGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="OTP not received" icon="envelope">
+    If the OTP email isn't arriving:
+    
+    1. Check spam/junk folder
+    2. Verify email address is correct
+    3. Ensure API key has "Users" scope enabled
+    4. Check Crossmint console for rate limits
+  </Accordion>
+  
+  <Accordion title="Transaction failing" icon="xmark">
+    Common reasons for transaction failures:
+    
+    1. **Insufficient balance** - Check wallet has enough tokens + gas
+    2. **Invalid address** - Verify recipient address format
+    3. **Wrong chain** - Ensure recipient address matches chain
+    4. **Network issues** - Try again after a moment
+  </Accordion>
+  
+  <Accordion title="Wallet not creating" icon="triangle-exclamation">
+    If wallet creation fails:
+    
+    1. Verify API key is valid and has correct scopes
+    2. Check that chain name is spelled correctly
+    3. Ensure JWT is provided for client-side calls
+    4. Review error message for specific details
+  </Accordion>
+</AccordionGroup>
+
+<Card title="Need Help?" icon="life-ring">
+  Join our [Discord community](https://discord.gg/crossmint) or check the [full documentation](https://docs.crossmint.com) for more assistance.
+</Card>

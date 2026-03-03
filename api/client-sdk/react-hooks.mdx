@@ -1,0 +1,424 @@
+---
+title: React Hooks
+description: React hooks for authentication, wallet management, and Crossmint SDK integration
+---
+
+## Overview
+
+The Crossmint React SDK provides hooks for managing authentication state, accessing wallet functionality, and integrating with the Crossmint API.
+
+## Installation
+
+```bash
+npm install @crossmint/client-sdk-react-ui
+```
+
+## useCrossmintAuth
+
+Access authentication state and methods. Alias: `useAuth`
+
+### Usage
+
+```tsx
+import { useCrossmintAuth } from '@crossmint/client-sdk-react-ui';
+
+function ProfilePage() {
+  const { 
+    user, 
+    jwt, 
+    status, 
+    login, 
+    logout,
+    experimental_loginWithOAuth 
+  } = useCrossmintAuth();
+
+  if (status === 'initializing') {
+    return <div>Loading...</div>;
+  }
+
+  if (status === 'logged-out') {
+    return <button onClick={() => login()}>Sign In</button>;
+  }
+
+  return (
+    <div>
+      <p>Welcome, {user?.email}</p>
+      <button onClick={logout}>Sign Out</button>
+    </div>
+  );
+}
+```
+
+### Return Value
+
+<ParamField path="user" type="User | undefined">
+  Current authenticated user
+  
+  <Expandable title="User type">
+    ```typescript
+    interface User {
+      id: string;
+      email?: string;
+      userId: string;
+    }
+    ```
+  </Expandable>
+</ParamField>
+
+<ParamField path="jwt" type="string | undefined">
+  JWT authentication token for the current session
+</ParamField>
+
+<ParamField path="status" type="AuthStatus">
+  Current authentication status
+  
+  <Expandable title="AuthStatus type">
+    ```typescript
+    type AuthStatus = 
+      | 'initializing'   // SDK is initializing
+      | 'logged-in'      // User is authenticated
+      | 'logged-out'     // User is not authenticated
+      | 'in-progress'    // Authentication in progress
+    ```
+  </Expandable>
+</ParamField>
+
+<ParamField path="login" type="(defaultEmail?: string) => void">
+  Opens the authentication dialog
+  
+  **Parameters:**
+  - `defaultEmail` (optional): Pre-fill email in the login form
+  
+  **Example:**
+  ```tsx
+  login('user@example.com');
+  ```
+</ParamField>
+
+<ParamField path="logout" type="() => Promise<void>">
+  Logs out the current user and clears authentication state
+  
+  **Example:**
+  ```tsx
+  await logout();
+  router.push('/login');
+  ```
+</ParamField>
+
+<ParamField path="getUser" type="() => Promise<User>">
+  Fetches the current user's information from the API
+  
+  **Example:**
+  ```tsx
+  const user = await getUser();
+  console.log(user.email);
+  ```
+</ParamField>
+
+<ParamField path="crossmintAuth" type="CrossmintAuthClient | undefined">
+  Direct access to the underlying auth client for advanced use cases
+</ParamField>
+
+<ParamField path="experimental_loginWithOAuth" type="(provider: OAuthProvider) => Promise<void>">
+  Programmatically initiate OAuth login without opening the dialog
+  
+  **Parameters:**
+  - `provider`: OAuth provider ('google', 'twitter', 'farcaster', etc.)
+  
+  **Example:**
+  ```tsx
+  await experimental_loginWithOAuth('google');
+  ```
+</ParamField>
+
+<ParamField path="experimental_externalWalletSigner" type="ExternalWalletSignerConfigForChain | undefined">
+  Web3 wallet signer configuration when using wallet-based authentication
+</ParamField>
+
+<ParamField path="loginMethods" type="LoginMethod[]">
+  Available login methods configured in the provider
+  
+  <Expandable title="LoginMethod type">
+    ```typescript
+    type LoginMethod = 
+      | 'email'
+      | 'google'
+      | 'twitter'
+      | 'farcaster'
+      | 'web3-injected'
+      | 'web3-walletconnect'
+      | 'web3-coinbase'
+    ```
+  </Expandable>
+</ParamField>
+
+### Error Handling
+
+```tsx
+const { login, status } = useCrossmintAuth();
+
+try {
+  login();
+  // Monitor status changes
+  if (status === 'logged-in') {
+    console.log('Login successful');
+  }
+} catch (error) {
+  console.error('Login failed:', error);
+}
+```
+
+### Requirements
+
+Must be used within `<CrossmintAuthProvider>`:
+
+```tsx
+import { 
+  CrossmintProvider, 
+  CrossmintAuthProvider,
+  useCrossmintAuth 
+} from '@crossmint/client-sdk-react-ui';
+
+function App() {
+  return (
+    <CrossmintProvider apiKey="your-api-key">
+      <CrossmintAuthProvider loginMethods={['email', 'google']}>
+        <ProfilePage />
+      </CrossmintAuthProvider>
+    </CrossmintProvider>
+  );
+}
+
+function ProfilePage() {
+  const auth = useCrossmintAuth();
+  // Use auth methods
+}
+```
+
+---
+
+## useCrossmint
+
+Access the core Crossmint SDK instance and configuration.
+
+### Usage
+
+```tsx
+import { useCrossmint } from '@crossmint/client-sdk-react-ui';
+
+function MyComponent() {
+  const { crossmint, experimental_customAuth } = useCrossmint();
+
+  console.log('API Key:', crossmint.apiKey);
+  console.log('Environment:', crossmint.environment);
+
+  return <div>...</div>;
+}
+```
+
+### Return Value
+
+<ParamField path="crossmint" type="Crossmint">
+  Core Crossmint SDK instance
+  
+  <Expandable title="properties">
+    <ParamField path="apiKey" type="string">
+      Your Crossmint API key
+    </ParamField>
+    <ParamField path="environment" type="'staging' | 'production'" optional>
+      Environment configuration
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="experimental_customAuth" type="CustomAuth | undefined">
+  Custom authentication configuration
+  
+  <Expandable title="CustomAuth type">
+    ```typescript
+    interface CustomAuth {
+      jwt?: string;
+      email?: string;
+      externalWalletSigner?: ExternalWalletSignerConfigForChain;
+    }
+    ```
+  </Expandable>
+</ParamField>
+
+<ParamField path="experimental_setCustomAuth" type="(auth: CustomAuth | undefined) => void">
+  Update custom authentication state
+</ParamField>
+
+### Requirements
+
+Must be used within `<CrossmintProvider>`:
+
+```tsx
+import { CrossmintProvider, useCrossmint } from '@crossmint/client-sdk-react-ui';
+
+function App() {
+  return (
+    <CrossmintProvider apiKey="your-api-key">
+      <MyComponent />
+    </CrossmintProvider>
+  );
+}
+
+function MyComponent() {
+  const { crossmint } = useCrossmint();
+  return <div>API Key: {crossmint.apiKey}</div>;
+}
+```
+
+---
+
+## useEnvironment
+
+Detect the current environment (staging or production) based on the API key.
+
+### Usage
+
+```tsx
+import { useEnvironment } from '@crossmint/client-sdk-react-ui';
+
+function DebugPanel() {
+  const environment = useEnvironment();
+
+  return (
+    <div>
+      <p>Running in: {environment}</p>
+      {environment === 'staging' && (
+        <div className="debug-banner">Test Mode</div>
+      )}
+    </div>
+  );
+}
+```
+
+### Return Value
+
+<ParamField path="environment" type="'staging' | 'production'">
+  Current environment determined from the Crossmint API key
+</ParamField>
+
+### Requirements
+
+Must be used within `<CrossmintProvider>`.
+
+---
+
+## useDeepEffect
+
+Utility hook for deep comparison of effect dependencies (prevents unnecessary re-renders).
+
+### Usage
+
+```tsx
+import { useDeepEffect } from '@crossmint/client-sdk-react-ui';
+
+function MyComponent({ config }) {
+  useDeepEffect(() => {
+    console.log('Config changed:', config);
+    // This only runs when config deeply changes
+  }, [config]);
+
+  return <div>...</div>;
+}
+```
+
+### Parameters
+
+<ParamField path="callback" type="() => void | (() => void)" required>
+  Effect callback (can return cleanup function)
+</ParamField>
+
+<ParamField path="dependencies" type="any[]" required>
+  Dependency array (performs deep equality check)
+</ParamField>
+
+---
+
+## useOAuthWindowListener
+
+Internal hook for handling OAuth popup window messages (advanced use).
+
+### Usage
+
+```tsx
+import { useOAuthWindowListener } from '@crossmint/client-sdk-react-ui';
+
+function OAuthHandler() {
+  useOAuthWindowListener({
+    onSuccess: (authData) => {
+      console.log('OAuth success:', authData);
+    },
+    onError: (error) => {
+      console.error('OAuth error:', error);
+    }
+  });
+
+  return <div>Processing OAuth...</div>;
+}
+```
+
+<Note>
+This hook is typically used internally by `CrossmintAuthProvider`. Use `experimental_loginWithOAuth` from `useCrossmintAuth` for standard OAuth flows.
+</Note>
+
+## Complete Example
+
+```tsx
+import {
+  CrossmintProvider,
+  CrossmintAuthProvider,
+  useCrossmintAuth,
+  useCrossmint,
+  useEnvironment
+} from '@crossmint/client-sdk-react-ui';
+
+function App() {
+  return (
+    <CrossmintProvider apiKey="your-api-key">
+      <CrossmintAuthProvider 
+        loginMethods={['email', 'google', 'farcaster']}
+        onLoginSuccess={() => console.log('Login successful!')}
+      >
+        <Dashboard />
+      </CrossmintAuthProvider>
+    </CrossmintProvider>
+  );
+}
+
+function Dashboard() {
+  const { user, status, login, logout } = useCrossmintAuth();
+  const { crossmint } = useCrossmint();
+  const environment = useEnvironment();
+
+  if (status === 'initializing') {
+    return <div>Loading...</div>;
+  }
+
+  if (status === 'logged-out') {
+    return (
+      <div>
+        <h1>Welcome to Crossmint</h1>
+        <button onClick={() => login()}>Sign In</button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <header>
+        <p>Welcome, {user?.email}</p>
+        <p>Environment: {environment}</p>
+        <button onClick={logout}>Sign Out</button>
+      </header>
+      <main>
+        <h2>Your Dashboard</h2>
+        {/* Your app content */}
+      </main>
+    </div>
+  );
+}
+```

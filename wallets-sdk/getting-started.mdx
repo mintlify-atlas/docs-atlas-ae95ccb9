@@ -1,0 +1,277 @@
+---
+title: "Getting Started"
+description: "Set up the Wallets SDK and create your first wallet"
+---
+
+## Prerequisites
+
+Before you begin, you'll need:
+
+1. A Crossmint API key (get one from the [Crossmint Console](https://www.crossmint.com/console))
+2. Ensure your API key has the following scopes enabled:
+   - `Wallet API`
+   - `Users`
+
+<Note>
+For client-side applications, use a **client-side API key**. For server-side applications, use a **server-side API key**.
+</Note>
+
+## Installation
+
+<Steps>
+  <Step title="Install the package">
+    Install the Wallets SDK using your preferred package manager:
+
+    <CodeGroup>
+    ```bash npm
+    npm install @crossmint/wallets-sdk
+    ```
+
+    ```bash pnpm
+    pnpm install @crossmint/wallets-sdk
+    ```
+
+    ```bash yarn
+    yarn add @crossmint/wallets-sdk
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Import the SDK">
+    Import the necessary functions from the SDK:
+
+    ```typescript
+    import { CrossmintWallets, createCrossmint } from "@crossmint/wallets-sdk";
+    ```
+  </Step>
+
+  <Step title="Initialize Crossmint">
+    Create a Crossmint instance with your API key:
+
+    <CodeGroup>
+    ```typescript Client-side
+    const crossmint = createCrossmint({
+        apiKey: "<your-client-api-key>",
+        experimental_customAuth: {
+            jwt: "<your-jwt>", // Required for client-side
+        },
+    });
+    ```
+
+    ```typescript Server-side
+    const crossmint = createCrossmint({
+        apiKey: "<your-server-api-key>",
+    });
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Create the Wallets SDK instance">
+    Initialize the Wallets SDK:
+
+    ```typescript
+    const crossmintWallets = CrossmintWallets.from(crossmint);
+    ```
+  </Step>
+</Steps>
+
+## Create Your First Wallet
+
+### Client-side: Get or Create Wallet
+
+On the client-side, use `getOrCreateWallet` to retrieve an existing wallet or create a new one:
+
+```typescript
+const wallet = await crossmintWallets.getOrCreateWallet({
+    chain: "polygon",
+    signer: {
+        type: "email",
+        email: "user@example.com",
+        onAuthRequired: async (needsAuth, sendEmailWithOtp, verifyOtp, reject) => {
+            if (needsAuth) {
+                // Send OTP to user's email
+                await sendEmailWithOtp();
+                
+                // Prompt the user for the OTP code
+                const otp = await promptUserForOtp(); // Your UI logic
+                
+                // Verify the OTP
+                await verifyOtp(otp);
+            }
+        },
+    },
+});
+
+console.log(wallet.address); // e.g., "0x1234..."
+```
+
+### Server-side: Create Wallet
+
+On the server-side, use `createWallet` with an API key signer:
+
+```typescript
+const wallet = await crossmintWallets.createWallet({
+    chain: "base",
+    signer: {
+        type: "api-key",
+    },
+});
+
+console.log(wallet.address);
+```
+
+### Server-side: Get Existing Wallet
+
+Retrieve an existing wallet by its address:
+
+```typescript
+const wallet = await crossmintWallets.getWallet(
+    "0x1234567890abcdef1234567890abcdef12345678",
+    {
+        chain: "polygon",
+        signer: {
+            type: "api-key",
+        },
+    }
+);
+```
+
+## Signer Types
+
+The SDK supports multiple signer types for authentication:
+
+### Email Signer
+
+```typescript
+{
+    type: "email",
+    email: "user@example.com",
+    onAuthRequired: async (needsAuth, sendEmailWithOtp, verifyOtp, reject) => {
+        if (needsAuth) {
+            await sendEmailWithOtp();
+            const otp = await promptUserForOtp();
+            await verifyOtp(otp);
+        }
+    },
+}
+```
+
+### Phone Signer
+
+```typescript
+{
+    type: "phone",
+    phone: "+1234567890",
+    onAuthRequired: async (needsAuth, sendSmsWithOtp, verifyOtp, reject) => {
+        if (needsAuth) {
+            await sendSmsWithOtp();
+            const otp = await promptUserForOtp();
+            await verifyOtp(otp);
+        }
+    },
+}
+```
+
+### Passkey Signer (EVM only)
+
+```typescript
+{
+    type: "passkey",
+    name: "My Passkey",
+    onCreatePasskey: async (name) => {
+        // Your WebAuthn passkey creation logic
+        return {
+            id: "passkey-id",
+            publicKey: { x: "...", y: "..." },
+        };
+    },
+    onSignWithPasskey: async (message) => {
+        // Your WebAuthn signing logic
+        return {
+            signature: { r: "...", s: "..." },
+            metadata: { ... },
+        };
+    },
+}
+```
+
+### External Wallet Signer
+
+<CodeGroup>
+```typescript EVM
+{
+    type: "external-wallet",
+    address: "0x...",
+    provider: window.ethereum, // EIP-1193 provider
+}
+```
+
+```typescript Solana
+{
+    type: "external-wallet",
+    address: "...",
+    onSignTransaction: async (transaction) => {
+        // Sign with Phantom, Solflare, etc.
+        return signedTransaction;
+    },
+    onSignMessage: async (message) => {
+        return { signature: "..." };
+    },
+}
+```
+</CodeGroup>
+
+### API Key Signer (Server-side only)
+
+```typescript
+{
+    type: "api-key",
+}
+```
+
+## Chain Selection
+
+Specify the blockchain when creating a wallet:
+
+<CodeGroup>
+```typescript EVM Chains
+chain: "ethereum" | "polygon" | "base" | "arbitrum" | "optimism" | "avalanche" | ...
+```
+
+```typescript Solana
+chain: "solana"
+```
+
+```typescript Stellar
+chain: "stellar"
+```
+</CodeGroup>
+
+## Wallet Properties
+
+Once you have a `Wallet` instance, you can access:
+
+```typescript
+wallet.address  // The wallet's blockchain address
+wallet.chain    // The blockchain network (e.g., "polygon")
+wallet.owner    // The owner identifier (if applicable)
+wallet.signer   // The signer configuration
+wallet.alias    // Optional wallet alias
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Wallet Operations" icon="list-check" href="/wallets-sdk/wallet-operations">
+    Learn how to check balances, send tokens, and view activity
+  </Card>
+  <Card title="EVM Wallets" icon="ethereum" href="/wallets-sdk/evm-wallets">
+    Work with EVM chains and smart contracts
+  </Card>
+  <Card title="Solana Wallets" icon="circle" href="/wallets-sdk/solana-wallets">
+    Build Solana applications
+  </Card>
+  <Card title="Delegated Signers" icon="users" href="/wallets-sdk/delegated-signers">
+    Add multiple signers to a wallet
+  </Card>
+</CardGroup>
