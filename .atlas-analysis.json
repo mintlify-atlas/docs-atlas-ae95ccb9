@@ -1,0 +1,143 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "Crossmint SDK",
+  "projectDescription": "A comprehensive suite of tools for blockchain integration, authentication, wallets, and NFT functionality",
+  "theme": "palm",
+  "primaryColor": "#0066FF",
+  "lightColor": "#4D94FF",
+  "darkColor": "#0052CC",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/authentication",
+              "concepts/wallets",
+              "concepts/chains",
+              "concepts/signers"
+            ]
+          },
+          {
+            "group": "Wallets SDK",
+            "pages": [
+              "wallets-sdk/overview",
+              "wallets-sdk/getting-started",
+              "wallets-sdk/wallet-operations",
+              "wallets-sdk/evm-wallets",
+              "wallets-sdk/solana-wallets",
+              "wallets-sdk/stellar-wallets",
+              "wallets-sdk/delegated-signers"
+            ]
+          },
+          {
+            "group": "Client SDKs",
+            "pages": [
+              "client-sdk/overview",
+              "client-sdk/react-ui",
+              "client-sdk/react-native-ui",
+              "client-sdk/auth",
+              "client-sdk/verifiable-credentials"
+            ]
+          },
+          {
+            "group": "Server SDK",
+            "pages": [
+              "server-sdk/overview",
+              "server-sdk/authentication",
+              "server-sdk/session-management",
+              "server-sdk/custom-refresh-routes"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/nft-checkout",
+              "guides/embedded-wallets",
+              "guides/credit-card-payments",
+              "guides/multi-chain-support",
+              "guides/custom-transactions"
+            ]
+          },
+          {
+            "group": "Examples",
+            "pages": [
+              "examples/nextjs-integration",
+              "examples/react-native-integration",
+              "examples/server-side-auth",
+              "examples/wallet-creation"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Wallets SDK",
+            "pages": [
+              "api/wallets-sdk/crossmint-wallets",
+              "api/wallets-sdk/wallet",
+              "api/wallets-sdk/evm-wallet",
+              "api/wallets-sdk/solana-wallet",
+              "api/wallets-sdk/stellar-wallet",
+              "api/wallets-sdk/types"
+            ]
+          },
+          {
+            "group": "Client SDK",
+            "pages": [
+              "api/client-sdk/crossmint-auth",
+              "api/client-sdk/react-components",
+              "api/client-sdk/react-hooks",
+              "api/client-sdk/react-providers",
+              "api/client-sdk/verifiable-credentials"
+            ]
+          },
+          {
+            "group": "Server SDK",
+            "pages": [
+              "api/server-sdk/crossmint-auth",
+              "api/server-sdk/session-methods",
+              "api/server-sdk/configuration"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Multi-chain wallet support (EVM, Solana, Stellar)",
+    "Authentication and session management",
+    "NFT checkout with credit card payments",
+    "Embedded wallets with email/phone signers",
+    "Verifiable credentials",
+    "React and React Native UI components",
+    "Server-side SDK for SSR applications"
+  ],
+  "publicApiSurface": [
+    "createCrossmint",
+    "CrossmintWallets",
+    "Wallet",
+    "EVMWallet",
+    "SolanaWallet",
+    "StellarWallet",
+    "CrossmintAuth (client)",
+    "CrossmintAuth (server)",
+    "CrossmintProvider",
+    "useWallet",
+    "useAuth",
+    "CrossmintAuthForm",
+    "WalletsApiClient"
+  ]
+}
